@@ -1,0 +1,5 @@
+#!/bin/sh
+
+echo w1-gpio >> /etc/modules
+echo w1-therm >> /etc/modules
+

@@ -1,0 +1,11 @@
+#!/bin/sh
+cp poold /etc/init.d/.
+chmod 0755 /etc/init.d/poold
+chown root:root /etc/init.d/poold
+ln -s /etc/init.d/poold /etc/rc0.d/K01poold
+ln -s /etc/init.d/poold /etc/rc1.d/K01poold
+ln -s /etc/init.d/poold /etc/rc2.d/S03poold
+ln -s /etc/init.d/poold /etc/rc3.d/S03poold
+ln -s /etc/init.d/poold /etc/rc4.d/S03poold
+ln -s /etc/init.d/poold /etc/rc5.d/S03poold
+ln -s /etc/init.d/poold /etc/rc6.d/K01poold

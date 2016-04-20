@@ -1,0 +1,111 @@
+#! /bin/sh
+
+### BEGIN INIT INFO
+# Provides:		poold
+# Required-Start:	$remote_fs $syslog
+# Required-Stop:	$remote_fs $syslog
+# Default-Start:	2 3 4 5
+# Default-Stop:
+# Short-Description:	Smart PoolPump Functionality
+### END INIT INFO
+
+set -e
+
+# /etc/init.d/poold: start and stop the poold daemon
+
+test -x /usr/local/bin/poold || exit 0
+umask 022
+
+. /lib/lsb/init-functions
+
+# Are we running from init?
+run_by_init() {
+    ([ "$previous" ] && [ "$runlevel" ]) || [ "$runlevel" = S ]
+}
+
+check_privsep_dir() {
+    # Create the PrivSep empty dir if necessary
+    if [ ! -d /var/cache/pooldata ]; then
+	mkdir /var/cache/pooldata
+	chmod 0755 /var/cache/pooldata
+    fi
+}
+
+export PATH="${PATH:+$PATH:}/usr/local/bin"
+
+case "$1" in
+  start)
+	check_privsep_dir
+	log_daemon_msg "Starting poold server" "poold" || true
+	if start-stop-daemon --start --quiet --background --make-pidfile --oknodo --pidfile /var/run/poold.pid --exec /usr/local/bin/poold; then
+	    log_end_msg 0 || true
+	else
+	    log_end_msg 1 || true
+	fi
+	;;
+  stop)
+	log_daemon_msg "Stopping poold server" "poold" || true
+	if start-stop-daemon --stop --quiet --oknodo --pidfile /var/run/poold.pid; then
+	    log_end_msg 0 || true
+	else
+	    log_end_msg 1 || true
+	fi
+	;;
+
+  reload|force-reload)
+	log_daemon_msg "Reloading poold configuration" "poold" || true
+	if start-stop-daemon --stop --signal 1 --quiet --oknodo --pidfile /var/run/poold.pid --exec /usr/local/bin/poold; then
+	    log_end_msg 0 || true
+	else
+	    log_end_msg 1 || true
+	fi
+	;;
+
+  restart)
+	check_privsep_dir
+	log_daemon_msg "Restarting poold server" "poold" || true
+	start-stop-daemon --stop --quiet --oknodo --retry 30 --pidfile /var/run/poold.pid
+	if start-stop-daemon --start --quiet --background --oknodo --make-pidfile --pidfile /var/run/poold.pid --exec /usr/local/bin/poold; then
+	    log_end_msg 0 || true
+	else
+	    log_end_msg 1 || true
+	fi
+	;;
+
+  try-restart)
+	check_privsep_dir
+	log_daemon_msg "Restarting poold server" "poold" || true
+	RET=0
+	start-stop-daemon --stop --quiet --retry 30 --pidfile /var/run/poold.pid || RET="$?"
+	case $RET in
+	    0)
+		# old daemon stopped
+		if start-stop-daemon --start --quiet --background --oknodo --make-pidfile --pidfile /var/run/poold.pid --exec /usr/local/bin/poold; then
+		    log_end_msg 0 || true
+		else
+		    log_end_msg 1 || true
+		fi
+		;;
+	    1)
+		# daemon not running
+		log_progress_msg "(not running)" || true
+		log_end_msg 0 || true
+		;;
+	    *)
+		# failed to stop
+		log_progress_msg "(failed to stop)" || true
+		log_end_msg 1 || true
+		;;
+	esac
+	;;
+
+  status)
+	status_of_proc -p /var/run/poold.pid /usr/local/bin/poold poold && exit 0 || exit $?
+	;;
+
+  *)
+	log_action_msg "Usage: /etc/init.d/poold {start|stop|reload|force-reload|restart|try-restart|status}" || true
+	exit 1
+esac
+
+exit 0

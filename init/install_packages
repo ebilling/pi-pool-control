@@ -1,0 +1,7 @@
+#!/bin/sh
+
+apt-get update
+apt-get upgrade
+apt-get install apache2
+apt-get install rrdtool
+apt-get install python-rrdtool
