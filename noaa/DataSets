@@ -1,0 +1,13 @@
+DataSets:
+[u'uid', u'maxdate', u'datacoverage', u'mindate', u'id', u'name']
+NORMAL_ANN :  [u'gov.noaa.ncdc:C00821', u'2010-01-01', 1, u'2010-01-01', u'NORMAL_ANN', u'Normals Annual/Seasonal']
+GHCNDMS :  [u'gov.noaa.ncdc:C00841', u'2016-03-01', 1, u'1763-01-01', u'GHCNDMS', u'Monthly Summaries']
+NORMAL_MLY :  [u'gov.noaa.ncdc:C00822', u'2010-12-01', 1, u'2010-01-01', u'NORMAL_MLY', u'Normals Monthly']
+NORMAL_DLY :  [u'gov.noaa.ncdc:C00823', u'2010-12-31', 1, u'2010-01-01', u'NORMAL_DLY', u'Normals Daily']
+ANNUAL :  [u'gov.noaa.ncdc:C00040', u'2015-11-01', 1, u'1831-02-01', u'ANNUAL', u'Annual Summaries']
+GHCND :  [u'gov.noaa.ncdc:C00861', u'2016-04-17', 1, u'1763-01-01', u'GHCND', u'Daily Summaries']
+PRECIP_15 :  [u'gov.noaa.ncdc:C00505', u'2014-01-01', 0.25, u'1970-05-12', u'PRECIP_15', u'Precipitation 15 Minute']
+NEXRAD3 :  [u'gov.noaa.ncdc:C00708', u'2016-04-10', 0.95, u'1994-05-20', u'NEXRAD3', u'Weather Radar (Level III)']
+NEXRAD2 :  [u'gov.noaa.ncdc:C00345', u'2016-04-19', 0.95, u'1991-06-05', u'NEXRAD2', u'Weather Radar (Level II)']
+PRECIP_HLY :  [u'gov.noaa.ncdc:C00313', u'2014-01-01', 1, u'1900-01-01', u'PRECIP_HLY', u'Precipitation Hourly']
+NORMAL_HLY :  [u'gov.noaa.ncdc:C00824', u'2010-12-31', 1, u'2010-01-01', u'NORMAL_HLY', u'Normals Hourly']

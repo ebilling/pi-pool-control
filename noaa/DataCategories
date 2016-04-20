@@ -1,0 +1,43 @@
+Data Categories:
+             DD Degree Days
+        ANNTEMP Annual Temperature
+    HYDROMETEOR Hydrometeor Type
+        OVERLAY Overlay
+         ANNAGR Annual Agricultural
+         WIPRCP Winter Precipitation
+   REFLECTIVITY Reflectivity
+         WXTYPE Weather Type
+          OTHER Other
+         AUTEMP Autumn Temperature
+           EVAP Evaporation
+          SUAGR Summer Agricultural
+          AUAGR Autumn Agricultural
+         SPPRCP Spring Precipitation
+  DUALPOLMOMENT Dual-Pol Moments
+            SUN Sunshine
+           TEMP Air Temperature
+          WATER Water
+           PRES Pressure
+        ANNPRCP Annual Precipitation
+           WIND Wind
+           PRCP Precipitation
+          WIAGR Winter Agricultural
+           SUDD Summer Degree Days
+           LAND Land
+            SKY Sky cover & clouds
+           AUDD Autumn Degree Days
+         SUPRCP Summer Precipitation
+          ANNDD Annual Degree Days
+           SPDD Spring Degree Days
+       VELOCITY Velocity
+         AUPRCP Autumn Precipitation
+          SPAGR Spring Agricultural
+         SUTEMP Summer Temperature
+           COMP Computed
+           WIDD Winter Degree Days
+        COMPAGR Computed Agricultural
+        ECHOTOP Echo Tops
+         SPTEMP Spring Temperature
+         WITEMP Winter Temperature
+  VERTINTLIQUID Vertical Integrated Liquid
+
