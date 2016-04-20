@@ -91,12 +91,17 @@ def produceGraph(filename, outfile="temperature.png", title=None, unit=FARENHEIT
 
 
 def main():
+    global counter
     setup()
     while True:
         for x in SENSORS:
             recordTemp(RrdFilename(x), temp.getTempC(x))
             out = "/var/www/html/%s.png" % (x)
             produceGraph(RrdFilename(x), outfile=out, title="Temperature")
+        if pump.getStartTime() and pump.getStartTime() < time.time() - RUN_TIME:
+            print "Time's Up: %f - %f" % (pump.getStartTime(), time.time())
+            pump.stopAll()
+            counter=0 
         time.sleep(60)
     GPIO.cleanup()
     quit()
