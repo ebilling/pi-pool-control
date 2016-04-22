@@ -13,7 +13,6 @@ GPIO.setmode(GPIO.BCM)
 
 def turnOn(gpios):
     global START_TIME
-    print "Turning on %s" % (str(gpios))
     for gpio in gpios:
         GPIO.output(gpio, True)
     START_TIME = time.time()
@@ -21,7 +20,6 @@ def turnOn(gpios):
 
 def turnOff(gpios):
     global START_TIME
-    print "Turning off %s" % (str(gpios))
     for gpio in gpios:
         GPIO.output(gpio, False)
     START_TIME = None
