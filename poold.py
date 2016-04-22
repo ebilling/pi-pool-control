@@ -16,22 +16,23 @@ BUTTON_GPIO = 18
 def RrdFilename(x):
     return "%s/%s.rrd" % (DATADIR, x)
 
+STATE_OFF = 0
+STATE_PUMP = 1
+STATE_SWEEP = 2
 
-counter = 0
+state = STATE_OFF
+
 def pushButtonCallback(channel):
-    global counter
-    # Need to create callbacks for button push counts
-    print "Button Pushed!!!!"
-    counter+=1
-    print "Status: " + str(pump.getStatus())
-    if counter%3 == 1:
+    global state
+    if state == STATE_OFF:
         pump.startPump()
-    elif counter%3 == 2:
+        state = STATE_PUMP
+    elif state == STATE_PUMP:
         pump.startSweep()
+        state = STATE_SWEEP
     else:
         pump.stopAll()
-    print "Status: " + str(pump.getStatus())
-
+        state = STATE_OFF
 
 def setup():
     # Initialize GPIO
@@ -101,7 +102,7 @@ def main():
         if pump.getStartTime() and pump.getStartTime() < time.time() - RUN_TIME:
             print "Time's Up: %f - %f" % (pump.getStartTime(), time.time())
             pump.stopAll()
-            counter=0 
+            state=STATE_OFF 
         time.sleep(60)
     GPIO.cleanup()
     quit()
