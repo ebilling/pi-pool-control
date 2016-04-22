@@ -2,90 +2,66 @@
 
 import json
 import httplib
+import time
+import requests
 
-# API Documentation: http://www.ncdc.noaa.gov/cdo-web/webservices/v2
+# Current Weather API
+# API discussion: http://stackoverflow.com/questions/2502340/noaa-web-service-for-current-weather
+# API: http://forecast.weather.gov/MapClick.php?lat=38.4247341&lon=-86.9624086&FcstType=json
+# Zipcode LAT/LNG: https://gist.github.com/erichurst/7882666
 
-NCDC_TOKEN = "MwtRFtJDlxGLsnBtnNcTbiuoabkNVHhT"
+zips = None
 
-header = {"token": NCDC_TOKEN}
-conn = httplib.HTTPConnection("www.ncdc.noaa.gov")
+MAX_AGE = 1800
+cache = {}
 
-
-def get(request):
-    conn.request("GET", request, None, header)
-    response = conn.getresponse()
-    data = response.read()
-    return data
-
-
-def getAll(request):
-    print "test"
-
-
-def getResults(data):
-    jsonData = json.loads(data)
-    keys = list()
-    out = {}
-    keys = jsonData["results"][0].keys()
-    appendResults(keys, out, jsonData)
-    return (keys, out)
+def getZipData():
+    global zips
+    zips={}
+    f = open('zip2latlng.csv', 'r')
+    f.readline() # Header
+    line = f.readline() # first line
+    while line:
+        line = line.strip().split(',')
+        zips[int(line[0])] = (float(line[1]), float(line[2]))
+        line = f.readline() # next line
+    f.close()
 
 
-def appendResults(keys, results, jsonData):
-    for x in jsonData["results"]:
-        row = list()
-        for key in keys:
-            row.append(x[key])
-        results[x["id"]] = row    
+def getLatLngByZip(zipcode):
+    global zips
+    return zips[zipcode]
 
 
-def getTypes():
-    typeQuery = "/cdo-web/api/v2/datatypes?locationid=ZIP:95032&limit=1000"
-    data = get(typeQuery)
-    return getResults(data)
-
-def getLocationsByZip():
-    limit = 1000
-    offset=0
-    locationQuery = "/cdo-web/api/v2/locations?locationcategoryid=ZIP&" +\
-                    "limit=%d&sortfield=id&sortorder=asc&offset=%d"
-    data = get(locationQuery % (limit, offset))
-    (keys, results) = getResults(data)
-    while True:
-        offset += limit
-        data = get(locationQuery % (limit, offset))
-        appendResults(keys, results, data)
-        if len(data["results"]) < 1000:
-            break
-    return (keys, results)
+def getWeatherByZip(zipcode):
+    global cache
+    global zips
+    if not zips:
+        getZipData()
+    if zipcode in cache and cache[zipcode][0] < time.time() - MAX_AGE:
+        return cache[zipcode][1]
+    (lat, lng) = zips[zipcode]
+    typeQuery = "http://forecast.weather.gov/MapClick.php?lat=%f&lon=%f&FcstType=json" % (lat, lng)
+    r = requests.get(typeQuery)
+    if r.status_code >= 200 and r.status_code < 300:
+        data = json.loads(r.text)
+        cache[zipcode] = (time.time(), data)
+        return data
+    return None
 
 
-def getDataCategories():
-    dataCategoriesQuery = "/cdo-web/api/v2/datacategories?limit=1000" 
-    data = get(dataCategoriesQuery)
-    return getResults(data)
+def getConditionsByZip(zipcode):
+    data = getWeatherByZip(zipcode)
+    weather = data['data']['weather'][0]
+    temperature = int(data['data']['temperature'][0])
+    return (int(temperature), weather)
 
 
-def getDataSets():
-    dataSetsQuery = "/cdo-web/api/v2/datasets?limit=1000" 
-    print "URL: ", dataSetsQuery
-    data = get(dataSetsQuery)
-    return getResults(data)
+def main():
+    print "Weather(%d: %s)" % getConditionsByZip(95032)
 
 
-def getData(datasetid, zip):
-    dataQuery = "/cdo-web/api/v2/data?datasetid=%s&locationid=ZIP:%s&units=metric&limit=1000"
-    data = get(dataQuery)
-    return data
+if __name__ == "__main__":
+    main()
 
 
-print "DataTypes:"
-(keys, data) = getTypes()
-print keys
-for x, y in data.items():
-    print x, ": ", y
-
-
-
-
-conn.close()
