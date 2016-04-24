@@ -4,29 +4,17 @@ import json
 import httplib
 import time
 import requests
+import zipcodes
 
 # Current Weather API
 # API discussion: http://stackoverflow.com/questions/2502340/noaa-web-service-for-current-weather
 # API: http://forecast.weather.gov/MapClick.php?lat=38.4247341&lon=-86.9624086&FcstType=json
 # Zipcode LAT/LNG: https://gist.github.com/erichurst/7882666
 
-zips = None
 
 MAX_AGE = 1800
 cache = {}
-
-def getZipData():
-    global zips
-    zips={}
-    f = open('zip2latlng.csv', 'r')
-    f.readline() # Header
-    line = f.readline() # first line
-    while line:
-        line = line.strip().split(',')
-        zips[int(line[0])] = (float(line[1]), float(line[2]))
-        line = f.readline() # next line
-    f.close()
-
+zips = zipcodes.latlngByZip()
 
 def getLatLngByZip(zipcode):
     global zips
@@ -36,8 +24,6 @@ def getLatLngByZip(zipcode):
 def getWeatherByZip(zipcode):
     global cache
     global zips
-    if not zips:
-        getZipData()
     if zipcode in cache and cache[zipcode][0] < time.time() - MAX_AGE:
         return cache[zipcode][1]
     (lat, lng) = zips[zipcode]
@@ -50,15 +36,29 @@ def getWeatherByZip(zipcode):
     return None
 
 
-def getConditionsByZip(zipcode):
+def getCurrentObservation(zipcode):
     data = getWeatherByZip(zipcode)
-    weather = data['data']['weather'][0]
-    temperature = int(data['data']['temperature'][0])
-    return (int(temperature), weather)
+    return data['currentobservation']
+
+
+def getForecastByZip(zipcode):
+    data = getWeatherByZip(zipcode)['data']
+    print "temperatureLen: ", len(data['temperature'])
+    print "weatherLen: ", len(data['weather'])
+    return data
+
+
+def printDict(d):
+    for key in sorted(d.keys()):
+        print "\t", key, ": ", d[key]
 
 
 def main():
-    print "Weather(%d: %s)" % getConditionsByZip(95032)
+    print "Weather:"
+    printDict(getForecastByZip(95032))
+    print
+    print "FullReport:"
+    printDict(getCurrentObservation(95032))
 
 
 if __name__ == "__main__":
