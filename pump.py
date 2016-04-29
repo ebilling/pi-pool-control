@@ -7,9 +7,20 @@ SWEEP_GPIO = (22, 23)
 
 START_TIME = None
 
+STATE_OFF = 0
+STATE_PUMP = 1
+STATE_SWEEP = 2
+
+_state_ = STATE_OFF
+
+
 # Initialize GPIO
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
+
+def state():
+    global _state_
+    return _state_
 
 def turnOn(gpios):
     global START_TIME
@@ -38,17 +49,20 @@ def getStatus(gpios=PUMP_GPIO + SWEEP_GPIO):
 
 
 def startPump():
+    global _state_
     turnOff(SWEEP_GPIO)
     turnOn(PUMP_GPIO)
-
+    _state_ = STATE_PUMP
 
 def startSweep():
+    global _state_
     turnOn(PUMP_GPIO + SWEEP_GPIO)
-
+    _state_ = STATE_SWEEP
 
 def stopAll():
+    global _state_
     turnOff(PUMP_GPIO + SWEEP_GPIO)
-
+    _state_ = STATE_OFF
 
 def setup():
     # Initialize GPIO

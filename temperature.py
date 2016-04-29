@@ -25,6 +25,11 @@ def toFarenheit(celsius):
     return  (celsius * 9 / 5) + 32
 
 
+# Converts a temperature in Farenheit to Celsius
+def toCelsius(farenheit):
+    return (farenheit - 32) * 5 / 9
+
+
 # Returns a list of all W1 devices on the system
 def getW1Devices():
     w1dirs = list()

@@ -11,3 +11,7 @@ ln -f -s /etc/init.d/poold /etc/rc4.d/S03poold
 ln -f -s /etc/init.d/poold /etc/rc5.d/S03poold
 ln -f -s /etc/init.d/poold /etc/rc6.d/K01poold
 systemctl daemon-reload
+
+
+mkfifo -m 0644 /var/run/poold.fifo
+chown www-data:www-data /var/run/poold.fifo

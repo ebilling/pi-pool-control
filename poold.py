@@ -7,41 +7,34 @@ import time
 import color
 import weather
 import sys
+import thread
+import os
+import log
 
 RUN_TIME = 60
 SENSORS = temp.getTempSensors()
-DATADIR = "/var/cache/pooldata"
+DATADIR = '/var/cache/pooldata'
 FARENHEIT = 0
 CELSIUS = 1
-GPIODIR = "/sys/class/gpio"
+GPIODIR = '/sys/class/gpio'
+CMDFIFO = '/tmp/poold.fifo'
+PIDFILE = '/var/run/poold.pid'
+WEATHER = 'weather'
 
 BUTTON_GPIO = 18
 
 def RrdFilename(x):
     return "%s/%s.rrd" % (DATADIR, x)
 
-WEATHER = "weather"
-
-STATE_OFF = 0
-STATE_PUMP = 1
-STATE_SWEEP = 2
-
-state = STATE_OFF
-
-def err(line):
-    print >> sys.stderr, line
 
 def pushButtonCallback(channel):
-    global state
-    if state == STATE_OFF:
+    state = pump.state()
+    if state == pump.STATE_OFF:
         pump.startPump()
-        state = STATE_PUMP
-    elif state == STATE_PUMP:
+    elif state == pump.STATE_PUMP:
         pump.startSweep()
-        state = STATE_SWEEP
     else:
         pump.stopAll()
-        state = STATE_OFF
 
 def setupRRD(filename, data_sources):
     try:
@@ -54,6 +47,12 @@ def setupRRD(filename, data_sources):
                     'RRA:AVERAGE:0.5:1:1200',
                     'RRA:AVERAGE:0.5:6:2400')
 
+def setupFifo():
+    log.debug("Setting up Fifo")
+    if not os.path.exists(CMDFIFO):
+        oldmask = os.umask(0)
+        os.mkfifo(CMDFIFO, 0666)
+        os.umask(oldmask)
 
 def setup():
     # Initialize GPIO
@@ -73,8 +72,9 @@ def setup():
     for x in SENSORS:
         setupRRD(RrdFilename(x), data_sources)
 
+
 def recordTemp(filename, t):
-    err("%s: N:%f:%f" % (filename, t, temp.toFarenheit(t)))
+    log.debug("%s: N:%f:%f" % (filename, t, temp.toFarenheit(t)))
     RRD.update(filename, "N:%f:%f" % (t, temp.toFarenheit(t)))
 
 
@@ -102,7 +102,7 @@ def produceGraph(filenames, outfile="temperature.png", title=None,
 
     try:
         week = 7*24*3600
-        err(args)
+        log.debug(str(args))
         RRD.graph(outfile,
                   "--end", "now",
                   "--start", "end-1h",
@@ -112,25 +112,53 @@ def produceGraph(filenames, outfile="temperature.png", title=None,
                   "--height", str(height),
                   *args)
     except RRD.error as e:
-        err("RRDTool Failed with: %s" % (e))
+        log.err("RRDTool Failed with: %s" % (e))
+
+
+def FifoThread():
+    setupFifo()
+    file = open(CMDFIFO, "r")
+    while True:
+        line = file.readline().strip()
+        if not line:
+            time.sleep(1)
+        elif line == 'PUMP_ON':
+            pump.startPump()
+        elif line == "SWEEP_ON":
+            pump.startSweep()
+        elif line == "OFF":
+            pump.stopAll()
+        else:
+            log.err("Don't know what to do with %s" % (line))
+    file.close()
 
 
 def main():
-    out = "/var/www/html/temps.png"
+    pid = os.fork()
+    if pid:
+        pidfile = open(PIDFILE, "w+")
+        pidfile.write(str(pid))
+        pidfile.close()
+        os._exit(0)
+
+    out = '/var/www/html/temps.png'
     setup()
     files = list()
     files.append(RrdFilename(WEATHER))
     for x in SENSORS:
         files.append(RrdFilename(x))
+    thread.start_new_thread(FifoThread, ())
+
     while True:
         recordTemp(RrdFilename(WEATHER),
                    temp.toCelsius(int(weather.getCurrentObservation(95032)['Temp'])))
         for x in SENSORS:
             recordTemp(RrdFilename(x), temp.getTempC(x))
+
+        #### should I move this to the pump control file?
         if pump.getStartTime() and pump.getStartTime() < time.time() - RUN_TIME:
-            err("Time's Up: %f - %f" % (pump.getStartTime(), time.time()))
+            log.info("Time's Up: %f - %f" % (pump.getStartTime(), time.time()))
             pump.stopAll()
-            state=STATE_OFF
 
         produceGraph(files, outfile=out, title="Temperature")
         time.sleep(60)

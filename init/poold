@@ -38,7 +38,7 @@ check_data_dir() {
 start_daemon() {
 	check_data_dir
 	log_daemon_msg "Starting poold server" "poold" || true
-	if start-stop-daemon --start --quiet --background --make-pidfile --oknodo --pidfile $pid --exec $bin; then
+	if start-stop-daemon --start --pidfile $pid --exec $bin; then
 	    log_end_msg 0 || true
 	else
 	    log_end_msg 1 || true
@@ -47,7 +47,7 @@ start_daemon() {
 
 stop_daemon() {
 	log_daemon_msg "Stopping poold server" "poold" || true
-	if start-stop-daemon --stop --quiet --oknodo --pidfile $pid; then
+	if start-stop-daemon --stop --pidfile $pid; then
 	    log_end_msg 0 || true
 	else
 	    log_end_msg 1 || true
