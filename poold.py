@@ -1,4 +1,5 @@
 #!/usr/bin/python
+
 import RPi.GPIO as GPIO
 import temperature as temp
 import rrdtool as RRD
@@ -11,9 +12,10 @@ import thread
 import os
 import log
 
-RUN_TIME = 60
+RUN_TIME = 1800
 SENSORS = temp.getTempSensors()
 DATADIR = '/var/cache/pooldata'
+PUMP_RRD = 'pumpstatus'
 FARENHEIT = 0
 CELSIUS = 1
 GPIODIR = '/sys/class/gpio'
@@ -36,16 +38,19 @@ def pushButtonCallback(channel):
     else:
         pump.stopAll()
 
-def setupRRD(filename, data_sources):
+
+def setupRRD(filename, data_sources, step=60,
+             consolidation="AVERAGE"):
     try:
         RRD.info(filename)
     except RRD.error:
         RRD.create( filename,
                     '--start', str(long(time.time())),
-                    '--step', '300',
+                    '--step', str(step),
                     data_sources,
-                    'RRA:AVERAGE:0.5:1:1200',
-                    'RRA:AVERAGE:0.5:6:2400')
+                    'RRA:%s:0.5:1:10080' % (consolidation),
+                    'RRA:%s:0.5:60:43830' % (consolidation))
+
 
 def setupFifo():
     log.debug("Setting up Fifo")
@@ -53,6 +58,7 @@ def setupFifo():
         oldmask = os.umask(0)
         os.mkfifo(CMDFIFO, 0666)
         os.umask(oldmask)
+
 
 def setup():
     # Initialize GPIO
@@ -72,27 +78,60 @@ def setup():
     for x in SENSORS:
         setupRRD(RrdFilename(x), data_sources)
 
+    data_sources = [ 'DS:pump:GAUGE:300:-1:2',
+                     'DS:sweep:GAUGE:300:-1:2' ]
+    setupRRD(RrdFilename(PUMP_RRD), data_sources, consolidation="MAX")
+
 
 def recordTemp(filename, t):
     log.debug("%s: N:%f:%f" % (filename, t, temp.toFarenheit(t)))
     RRD.update(filename, "N:%f:%f" % (t, temp.toFarenheit(t)))
 
 
-def produceGraph(filenames, outfile="temperature.png", title=None,
-                 unit=FARENHEIT, width=500, height=300):
+def recordPumpActivity(filename):
+    p = 0
+    s = 0
+    if pump.state() == pump.STATE_SWEEP:
+        p = 1
+        s = 1
+    elif pump.state() == pump.STATE_PUMP:
+        p = 1
+    log.debug("%s: N:%d:%d" % (filename, p, s))
+    RRD.update(filename, "N:%d:%d" % (p, s))
+
+
+def produceGraph(outfile, title, width, height, args):
+    week = 7*24*3600
+    log.debug(str(args))
+    try:
+        RRD.graph(outfile,
+                  "--end", "now",
+                  "--start", "end-16h",
+                  "--imgformat", "PNG",
+                  "--title", title,
+                  "--width", str(width),
+                  "--height", str(height),
+                  *args)
+    except RRD.error as e:
+        log.error("RRDTool Failed with: %s" % (e))
+
+
+def produceTempGraph(filenames, outfile="temperature.png", title='Temperatures',
+                 unit=FARENHEIT, width=700, height=300):
     args = list()
     count = 0
     gdef_fmt = 'DEF:t%d=%s:%s:AVERAGE'
-    gline_fmt = 'LINE%d:t%d%s:"%s"'
+    gline_fmt = 'LINE%d:t%d%s:%s'
     for filename in filenames:
+        filename = RrdFilename(filename)
         if unit == FARENHEIT:
             args.append(gdef_fmt % (count, filename, "farenheit"))
             args.append(gline_fmt % (count+1, count, color.colorStr(count),
-                                     "deg_F"))
+                                     filename + " F"))
         elif unit == CELSIUS:
             args.append(gdef_fmt % (count, filename, "celsius"))
             args.append(gline_fmt % (count+1, count, color.colorStr(count),
-                                     "deg_C"))
+                                     filename + " C"))
         else:
             raise ValueError("Must be either FARENHEIT or CELSIUS")
         count+=1
@@ -100,19 +139,20 @@ def produceGraph(filenames, outfile="temperature.png", title=None,
     if title == None:
         title = filename 
 
-    try:
-        week = 7*24*3600
-        log.debug(str(args))
-        RRD.graph(outfile,
-                  "--end", "now",
-                  "--start", "end-1h",
-                  "--imgformat", "PNG",
-                  "--title", title,
-                  "--width", str(width),
-                  "--height", str(height),
-                  *args)
-    except RRD.error as e:
-        log.err("RRDTool Failed with: %s" % (e))
+    produceGraph(outfile, title, width, height, args)
+
+
+def producePumpGraph(outfile='pumps.png', title='Pump Activity', width=700, height=300):
+    args = list()
+    gdef_fmt = 'DEF:t%d=%s:%s:MAX'
+    gline_fmt = 'LINE%d:t%d%s:%s'
+
+    args.append(gdef_fmt % (1, RrdFilename(PUMP_RRD), 'pump'))
+    args.append(gline_fmt % (1, 1, color.colorStr(0), "Main Pump"))
+    args.append(gdef_fmt % (2, RrdFilename(PUMP_RRD), 'sweep'))
+    args.append(gline_fmt % (2, 2, color.colorStr(1), "Sweep Pump"))
+
+    produceGraph(outfile, title, width, height, args)
 
 
 def FifoThread():
@@ -129,7 +169,7 @@ def FifoThread():
         elif line == "OFF":
             pump.stopAll()
         else:
-            log.err("Don't know what to do with %s" % (line))
+            log.error("Don't know what to do with %s" % (line))
     file.close()
 
 
@@ -141,12 +181,15 @@ def main():
         pidfile.close()
         os._exit(0)
 
-    out = '/var/www/html/temps.png'
+    outdir = '/var/www/html/'
+    tempGraph = outdir + 'temps.png'
+    pumpGraph = outdir + 'pumps.png'
+
     setup()
     files = list()
-    files.append(RrdFilename(WEATHER))
+    files.append(WEATHER)
     for x in SENSORS:
-        files.append(RrdFilename(x))
+        files.append(x)
     thread.start_new_thread(FifoThread, ())
 
     while True:
@@ -155,13 +198,17 @@ def main():
         for x in SENSORS:
             recordTemp(RrdFilename(x), temp.getTempC(x))
 
+        recordPumpActivity(RrdFilename(PUMP_RRD))
+
         #### should I move this to the pump control file?
         if pump.getStartTime() and pump.getStartTime() < time.time() - RUN_TIME:
             log.info("Time's Up: %f - %f" % (pump.getStartTime(), time.time()))
             pump.stopAll()
 
-        produceGraph(files, outfile=out, title="Temperature")
-        time.sleep(60)
+        produceTempGraph(files, outfile=tempGraph)
+        producePumpGraph(outfile=pumpGraph)
+        time.sleep(10)
+
     GPIO.cleanup()
     quit()
 
