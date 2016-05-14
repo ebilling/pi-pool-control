@@ -157,20 +157,22 @@ def producePumpGraph(outfile='pumps.png', title='Pump Activity', width=700, heig
 
 def FifoThread():
     setupFifo()
-    file = open(CMDFIFO, "r")
+    count = 0;
     while True:
-        line = file.readline().strip()
-        if not line:
-            time.sleep(1)
-        elif line == 'PUMP_ON':
-            pump.startPump()
-        elif line == "SWEEP_ON":
-            pump.startSweep()
-        elif line == "OFF":
-            pump.stopAll()
-        else:
-            log.error("Don't know what to do with %s" % (line))
-    file.close()
+        file = open(CMDFIFO, "r")
+        for x in range(0, 10):
+            line = file.readline().strip()
+            if not line:
+                time.sleep(1)
+            elif line == 'PUMP_ON':
+                pump.startPump()
+            elif line == "SWEEP_ON":
+                pump.startSweep()
+            elif line == "OFF":
+                pump.stopAll()
+            else:
+                log.error("Don't know what to do with %s" % (line))
+        file.close()
 
 
 def main():
