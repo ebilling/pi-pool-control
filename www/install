@@ -1,0 +1,13 @@
+#!/bin/sh
+
+mv /etc/apache2/apache2.conf /etc/apache2/apache2.conf.orig
+cp -p apache2.conf /etc/apache2/.
+
+cp -p index.* /var/www/html/.
+
+cd /etc/apache2/mods-enabled
+ln -s ../mods-available/cgi.load .
+
+/etc/init.d/apache2 stop
+/etc/init.d/apache2 start
+

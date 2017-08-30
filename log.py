@@ -1,7 +1,8 @@
 import syslog
+import traceback
 
 def log(msg):
-    syslog.syslog(msg)
+    info(msg)
 
 def crit(msg):
     syslog.syslog(syslog.LOG_CRIT, msg)
@@ -18,5 +19,10 @@ def info(msg):
 def debug(msg):
     syslog.syslog(syslog.LOG_DEBUG, msg)
 
+def trace(msg):
+    s = "\n"
+    for line in traceback.format_list(traceback.extract_stack()):
+        s += line
+    debug(msg + s)
 
 syslog.openlog(logoption=syslog.LOG_PID, facility=syslog.LOG_USER)
