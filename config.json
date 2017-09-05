@@ -1,12 +1,12 @@
 {
     "timer": {
 	"pump": {
-	    "start": "3:00",
-	    "stop": "5:00"
+	    "start": "9:00",
+	    "stop": "10:30"
 	},
 	"sweep": {
-	    "start": "3:15",
-	    "stop": "4:15"
+	    "start": "9:30",
+	    "stop": "9:50"
 	}
     },
     "capacitance": {
@@ -16,7 +16,6 @@
 	}
     },
     "weather": {
-	
 	"zip": "95032",
 	"appid": "ccf828d572d7846c"
     },
@@ -25,7 +24,7 @@
 	"#testvalue": { "24": "27", "25": "34.5"}
     },
     "graph": {
-	"scale": "60m"
+	"scale": "6h"
     },
     "path": {
 	"cmdfifo": "/tmp/poold.fifo",

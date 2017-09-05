@@ -104,42 +104,47 @@ def _getEpoch(time_str, push=False):
     local = _getsched(int(hour), int(minute), push)
     return time.mktime(local)
 
-
-def startOnSchedule(gpio, start, stop):
-    global _state_
-
+def _inZone(start, stop):
     t = time.time()
     start_time = _getEpoch(start)
     stop_time = _getEpoch(stop)
+    log.debug("Schedule: now(%d) start(%d) stop(%d)" % (t, start_time, stop_time))
     if stop_time < start_time:
         stop_time = _getEpoch(stop, True)
-    if t > start_time and start_time > STOP_TIME and t < stop_time:
-        if gpio == SWEEP_GPIO:
-            if state() != STATE_SCHEDULED_SWEEP:
-                startSweep()
-                _state_ = STATE_SCHEDULED_SWEEP
-        else:
-            if state() != STATE_SCHEDULED_PUMP:
-                startPump()
-                _state_ = STATE_SCHEDULED_PUMP
+    if t < stop_time and t > start_time and start_time > STOP_TIME:
+        return True
+    return False
+
+def runOnSchedule():
+    global _state_
+    global sched_pump_start
+    global sched_pump_stop
+    global sched_sweep_start
+    global sched_sweep_stop
+
+    if _inZone(sched_sweep_start, sched_sweep_stop):
+        if state() != STATE_SCHEDULED_SWEEP:
+            startSweep()
+            _state_ = STATE_SCHEDULED_SWEEP
         return True
 
-    if t > stop_time and (state() == STATE_SCHEDULED_PUMP or state() == STATE_SCHEDULED_SWEEP):
+    if _inZone(sched_pump_start, sched_pump_stop):
+        if state() != STATE_SCHEDULED_PUMP:
+            startPump()
+            _state_ = STATE_SCHEDULED_PUMP
+        return True
+
+    if state() in [STATE_SCHEDULED_PUMP, STATE_SCHEDULED_SWEEP]:
         log.info("Stopping scheduled run")
-        pump.stopAll()
+        stopAll()
         return False
 
     if state() != STATE_OFF and getStartTime() < time.time() - RUN_TIME:
-        log.info("Time's Up: %f - %f" % (getStartTime(), time.time()))
-        pump.stopAll()
+        log.info("Stopping manual run")
+        stopAll()
 
     return False
 
-
-def runOnSchedule():
-    if not startOnSchedule(SWEEP_GPIO, sched_sweep_start, sched_sweep_stop):
-        startOnSchedule(PUMP_GPIO, sched_pump_start, sched_pump_stop)
-    
 
 def setup(conf):
     global sched_pump_start
