@@ -14,6 +14,7 @@ set -e
 # /etc/init.d/poold: start and stop the poold daemon
 datadir='/var/cache/pooldata'
 pid='/var/run/poold.pid'
+conf='/etc/poold.conf'
 bin='/usr/local/bin/poold'
 
 test -x $bin || exit 0
@@ -38,7 +39,7 @@ check_data_dir() {
 start_daemon() {
 	check_data_dir
 	log_daemon_msg "Starting poold server" "poold" || true
-	if start-stop-daemon --start --pidfile $pid --exec $bin; then
+	if start-stop-daemon --start --pidfile $pid --exec $bin $conf; then
 	    log_end_msg 0 || true
 	else
 	    log_end_msg 1 || true

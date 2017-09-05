@@ -1,0 +1,37 @@
+{
+    "timer": {
+	"pump": {
+	    "start": "3:00",
+	    "stop": "5:00"
+	},
+	"sweep": {
+	    "start": "3:15",
+	    "stop": "4:15"
+	}
+    },
+    "capacitance": {
+	"gpio": {
+	    "24": "10.4",
+	    "25": "9.37"
+	}
+    },
+    "weather": {
+	
+	"zip": "95032",
+	"appid": "ccf828d572d7846c"
+    },
+    "temp": {
+	"target": "21",
+	"#testvalue": { "24": "27", "25": "34.5"}
+    },
+    "graph": {
+	"scale": "60m"
+    },
+    "path": {
+	"cmdfifo": "/tmp/poold.fifo",
+	"temperature": "/tmp/pool_temp"	
+    },
+    "homekit": {
+	"pin": "740237184"
+    }
+}

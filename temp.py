@@ -7,8 +7,8 @@ import time
 import log
 import config
 
-TIMEOUT = 1.0    # 1s
-DRAINTIME = 0.2 # 100ms
+TIMEOUT = 1.0   # 1s
+DRAINTIME = 0.2 # 200ms
 ATTEMPTS = 5
 
 TTL = 60.0 # 1 minutes
@@ -28,6 +28,8 @@ def setup(conf):
          _test[int(key)] = float(testvalues[key])
 
 def average(x):
+   if x == 0 or len(x) == 0:
+      return 0
    return float(sum(x))/float(len(x))
 
 def variance(x):
@@ -35,11 +37,13 @@ def variance(x):
    var = 0.0
    for n in x:
       var = var + (avg - n) ** 2
-   return var/len(x)
+   if len(x) > 0:
+      return var/len(x)
+   return 0.0
 
 def stddev(x):
    return variance(x) ** 0.5
-   
+
 def cleanData(gpio, x):   
    global past
    old = None
@@ -50,16 +54,15 @@ def cleanData(gpio, x):
       avg = past[gpio][1]
    else:
       old = deque(x, 200)
-      avg = sum(x)/len(x)
+      avg = average(x)
 
    stdd = 1.5 * stddev(list(old))
    n = list()
    for i in x:
       if abs(i - avg) < stdd:
          n.append(i)
-
    if len(n) > 0:
-      n = sum(n)/len(n)
+      n = average(n)
       past[gpio] = (old, n, time.time())
 
    return past[gpio][1]
@@ -85,7 +88,7 @@ def _getDischargeTime(gpio):
          end = time.time()
       tm = (end - start) * 1000000.0
       if end < timeout:
-         if tm > 50.0 and tm < 125000.0:
+         if tm > 20000.0 and tm < 150000.0: # roughly 115F to 35F
             values.append(tm)
       else:
          log.info("Temperature fetch timed out for gpio(%d)" % (gpio))
@@ -117,13 +120,15 @@ def getTempC(gpio):
    #DEBUGGING CODE
    if gpio in _test:
       return _test[gpio]
-
-   if gpio in past:
-      if past[gpio][2] + TTL > time.time():
-         return _getTemp(_getOhms(past[gpio][1],gpio))  # Cached value
-   t = _getDischargeTime(gpio)
-   return _getTemp(_getOhms(t, gpio))
-
+   try:
+      if gpio in past:
+         if past[gpio][2] + TTL > time.time():
+            return _getTemp(_getOhms(past[gpio][1],gpio))  # Cached value
+      t = _getDischargeTime(gpio)
+      return _getTemp(_getOhms(t, gpio))
+   except Exception as e:
+      log.trace("Could not read temperature: gpio(%d) exception(%s)" % (gpio, str(e)))
+   return 0.0
 # Converts a temperature in Celsius to Farenheit
 def toFarenheit(celsius):
     return  (float(celsius) * 9.0 / 5.0) + 32.0
@@ -144,7 +149,7 @@ if __name__ == "__main__":
    RUN_TIME = 20
    CAP_GPIO = 25 # 24,25
 
-   setup(config.config("poold.conf"))
+   setup(config.config("config.json"))
    
    if len(sys.argv) > 1:
       cap_gpio = int(sys.argv[1])

@@ -1,40 +1,29 @@
 #!/usr/bin/python
 
+import json
+import log
+
 class config:
     def __init__(self, filename):
         self._readConfig(filename)
 
-    def add(self, name, value):
-        name = name.split('.')
-        element = self._config
-        for i, word in enumerate(name):
-            if word not in element:
-                if i == len(name)-1:
-                    element[word] = value
-                else:
-                    element[word] = {}
-            element = element[word]
-
     def get(self, name):
         element = self._config
         names = name.split('.')
-
         for word in names:
             if word in element:
                 element = element[word]
             else:
                 return None
-        return element
+        #TODO: Detect a leaf and return a string, otherwise, return dict
+        if isinstance(element, dict):
+            return element
+        return str(element)
 
     def _readConfig(self, filename):
         self._config = {}
         f = open(filename, "r")
-        for line in f:
-            line = line.strip()
-            if len(line) == 0 or line[0] == '#':
-                continue # Skip comments and blank lines            
-            (name,value) = line.split('=')
-            self.add(name, value)
+        self._config = json.load(f)
         f.close()
 
 
@@ -42,9 +31,10 @@ if __name__ == "__main__":
 
     import config
 
-    conf = config.config("poold.conf")
-    capacitance = conf.get("capacitance")
+    conf = config.config("config.json")
+    capacitance = conf.get("capacitance.gpio.24")
 
-    print str(conf._config)
-    print(str(capacitance))
+    print "Whole Config:\n" + str(conf._config)
+
+    print "\n\nCapacitance:\n" + capacitance
 

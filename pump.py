@@ -130,7 +130,7 @@ def startOnSchedule(gpio, start, stop):
         return False
 
     if state() != STATE_OFF and getStartTime() < time.time() - RUN_TIME:
-        log.info("Time's Up: %f - %f" % (pump.getStartTime(), time.time()))
+        log.info("Time's Up: %f - %f" % (getStartTime(), time.time()))
         pump.stopAll()
 
     return False

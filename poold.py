@@ -14,8 +14,7 @@ import log
 import config
 import solar
 
-CONFIG_FILE = '/home/pi/Workspace/pi-pool-control/poold.conf'
-conf = config.config(CONFIG_FILE)
+conf = None
 _scale = "24h"
 
 FARENHEIT = 0
@@ -72,10 +71,18 @@ def setupFifo():
         oldmask = os.umask(0)
         os.mkfifo(CMDFIFO, 0666)
         os.umask(oldmask)
+    else:
+        # Empty the fifo
+        f = open(CMDFIFO, "r")
+        while True:
+            line = f.readline()
+            if not line or line == None:
+                break
+        f.close()
 
-def updateConfig():
+def updateConfig(configfile):
     global conf, ZIP, _scale
-    conf = config.config(CONFIG_FILE)
+    conf = config.config(configfile)
     ZIP = int(conf.get('weather.zip'))
     if conf.get('graph.scale') != None:
         _scale = conf.get('graph.scale')
@@ -88,7 +95,7 @@ def updateConfig():
     solar.setup(conf)
     weather.setAppid(conf.get('weather.appid'))
 
-def setup():
+def setup(configfile):
     # Initialize GPIO
     GPIO.setwarnings(False)
     GPIO.setmode(GPIO.BCM)
@@ -96,7 +103,8 @@ def setup():
     GPIO.output(GREEN_LED, True)
 
     # Read config
-    updateConfig()
+    updateConfig(configfile)
+
 
     # Initialize Button
     GPIO.setup(BUTTON_GPIO, GPIO.IN, pull_up_down=GPIO.PUD_UP)
@@ -125,22 +133,23 @@ def recordTemp(weather, pool, solar, target):
 
 def recordPumpActivity():
     RRD.update(RrdFilename(PUMP_RRD), "N:%d:%d" % (pump.state(), solar.state()))
-#    log.debug("Pumps: pump(%d) solar(%d)" % (pump.state(), solar.state()))
+    log.debug("Pumps: pump(%d) solar(%d)" % (pump.state(), solar.state()))
 
 
 def produceGraph(outfile, title, width, height, args):
     global _scale
     week = 7*24*3600
     scale = "end-%s" % (_scale)
+    #log.debug("outfile:%s, title:%s, width:%d, height:%d, scale:%s, args:%s" % (outfile, title, width, height, scale, args))
     try:
         RRD.graph(outfile,
+                  "--imgformat", "PNG",
                   "--end", "now",
                   "--start", scale,
-                  "--imgformat", "PNG",
                   "--title", title,
                   "--width", str(width),
                   "--height", str(height),
-                  *args)
+                  args)
     except RRD.error as e:
         log.error("RRDTool Failed with: %s" % (e))
 
@@ -160,12 +169,12 @@ def appendTempLine(args, c, var, title, col, unit=FARENHEIT):
 def produceTempGraph(outfile="temperature.png", title='Temperatures',
                      unit=FARENHEIT, width=700, height=300):
     args = list()
-    args.append(["--right-axis-label", "Degrees Farenheit",
+    args.extend(["--right-axis-label", "Degrees Farenheit",
                  "--right-axis", "1:0"])
-    appendTempLine(args, 1, "weather", "Weather F", 0)
-    appendTempLine(args, 2, "pool", "Pool F", 1)
-    appendTempLine(args, 3, "solar", "Solar F", 2)
-    appendTempLine(args, 4, "target", "Target F", 6)
+    appendTempLine(args, 1, "weather", "Weather F", 0, unit)
+    appendTempLine(args, 2, "pool", "Pool F", 1, unit)
+    appendTempLine(args, 3, "solar", "Solar F", 2, unit)
+    appendTempLine(args, 4, "target", "Target F", 6, unit)
 
     produceGraph(outfile, title, width, height, args)
 
@@ -176,9 +185,9 @@ def producePumpGraph(outfile='pumps.png', title='Pump Activity', width=700, heig
     gline_fmt = 'LINE%d:t%d%s:%s'
 
     args.append(gdef_fmt % (1, RrdFilename(PUMP_RRD), 'pump'))
-    args.append(gline_fmt % (2, 1, color.colorStr(0), "Pump Status"))
+    args.append(gline_fmt % (2, 1, color.colorStr(0), 'Pump Status'))
     args.append(gdef_fmt % (2, RrdFilename(PUMP_RRD), 'solar'))
-    args.append(gline_fmt % (2, 2, color.colorStr(2), "Solar"))
+    args.append(gline_fmt % (2, 2, color.colorStr(2), 'Solar'))
 
     produceGraph(outfile, title, width, height, args)
 
@@ -202,6 +211,7 @@ def FifoThread():
         else:
             log.error("Don't know what to do with %s" % (line))
         file.close()
+        time.sleep(1)
 
 def SolarThread():
     while True:
@@ -214,7 +224,7 @@ def PumpScheduleThread():
         pump.runOnSchedule()
         time.sleep(60)
 
-def main():
+def main(args):
     pid = os.fork()
     if pid:
         pidfile = open(PIDFILE, "w+")
@@ -222,18 +232,19 @@ def main():
         pidfile.close()
         os._exit(0)
 
+    setup(args[1])
+
     outdir = IMAGEDIR
     tempGraph = outdir + 'temps.png'
     pumpGraph = outdir + 'pumps.png'
     
-    setup()
     thread.start_new_thread(FifoThread, ())
     thread.start_new_thread(SolarThread, ())
     thread.start_new_thread(PumpScheduleThread, ())
 
     while True:
         time.sleep(30)
-        updateConfig()
+        updateConfig(args[1])
         recordTemp(weather.getCurrentTempC(ZIP), solar.waterTemp(),
                    solar.roofTemp(), solar.targetTemp)
         recordPumpActivity()
@@ -246,4 +257,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) < 2:
+        print "Usage: %s configFile" % (sys.argv[0])
+    main(sys.argv)

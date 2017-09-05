@@ -28,19 +28,21 @@ _state_ = 0
 __initialized__ = False
 
 
+def state():
+    global _state_
+    return _state_
+
+
 # Between 11PM and 5AM (Coldest Time)
 def isNight():
     ts = time.localtime()
     return (ts.tm_hour > 22 or ts.tm_hour < 6)
 
+
 # Between 10AM and 4PM (Peak Sun)
 def isDay():
     ts = time.localtime()
     return (ts.tm_hour < 17 and ts.tm_hour > 9)
-
-def state():
-    global _state_
-    return _state_
 
 
 # Get temp from the cache and update the cache if needed/possible
@@ -58,6 +60,7 @@ def waterTemp():
             pump.startSolar()
     return _lastRunningWaterTemp
 
+
 # Returns temperature of the roof
 def roofTemp():
     return temp.getTempC(ROOF_GPIO)
@@ -71,9 +74,10 @@ def flowThroughCollectors():
 
     if _lastRunningWaterTemp == 0.0:
         return False
-    
-#    log.debug("pool(%0.1f) roof(%0.1f) target(%0.1f) tol(%0.1f) dT(%0.1f) night(%s) day(%s)" % (
-#        poolTemp, roofTemp(), targetTemp, _tolerance, _deltaT, str(isNight()), str(isDay())))
+
+    #log.debug("pool(%0.1f) roof(%0.1f) target(%0.1f) tol(%0.1f) dT(%0.1f) night(%s) day(%s)" % (
+    #    poolTemp, roofTemp(), targetTemp, _tolerance, _deltaT, str(isNight()), str(isDay())))
+
     # Cooling mode
     if poolTemp > targetTemp + _tolerance and poolTemp > roofTempC + _deltaT and isNight():
         if _state_ == 1:
@@ -94,9 +98,12 @@ def flowThroughCollectors():
         _state_ = 1
         return True
 
-    relay.turnOff([SOLAR_RELAY])
-    GPIO.output(RED_LED, False)
-    _state_ = 0 
+    if _state_ != 0:
+        relay.turnOff([SOLAR_RELAY])
+        GPIO.output(RED_LED, False)
+        log.info("Turning off Solar")
+        _state_ = 0
+
     return False
 
 

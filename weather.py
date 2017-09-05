@@ -57,12 +57,12 @@ def getCurrentTempC(zipcode):
     co = getWeatherByZip(zipcode)
     if co == None:
         return 0.0
-    return float(co["current_observation"]['temp_c'])
+    return float(co['current_observation']['temp_c'])
 
 def getSolarRadiation(zipcode):
     co = getWeatherByZip(zipcode)
     if co != None:
-        co = co["current_observation"]
+        co = co['current_observation']
         if 'solarradiation' in co:
             return float(co['solarradiation'])
     return 0.0
@@ -74,9 +74,9 @@ def printDict(d):
 
 if __name__ == "__main__":
     import config
-    conf = config.config("poold.conf")
-    z = int(conf.get("weather.zip"))
-    setAppid(conf.get("weather.appid"))
+    conf = config.config('config.json')
+    z = int(conf.get('weather.zip'))
+    setAppid(conf.get('weather.appid'))
     print "Temp(%0.1fC) SolarRadiation(%0.2f)w/sqm" % (
         getCurrentTempC(z), getSolarRadiation(z))
     print "FullReport:"
