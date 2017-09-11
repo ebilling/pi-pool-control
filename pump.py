@@ -10,6 +10,7 @@ SWEEP_GPIO = relay.RELAY2
 START_TIME = 0.0
 STOP_TIME = 0.0
 
+STATE_DISABLED = -1
 STATE_OFF = 0
 STATE_PUMP = 1
 STATE_SWEEP = 2
@@ -17,9 +18,9 @@ STATE_SCHEDULED_PUMP = 3
 STATE_SCHEDULED_SWEEP = 4
 STATE_SOLAR = 5
 STATE_SOLAR_MIXING = 6
-STATE_DISABLED = 7
 
 RUN_TIME = 7200
+PUMP_STATUS = '/tmp/pump_status'
 
 _state_ = STATE_OFF
 
@@ -33,10 +34,22 @@ def state():
     return _state_
 
 
+def _setState(state):
+    global _state_
+    _state_ = state
+    tempfile = open(PUMP_STATUS, 'w+')
+    tempfile.write(str(_state_))
+    tempfile.close()
+
+
+def setStatePath(path):
+    global PUMP_STATUS
+    PUMP_STATUS = path
+
 def turnOn(gpios):
-    global START_TIME, _state_
+    global START_TIME
     relay.turnOn(gpios)
-    if _state_ == STATE_OFF:
+    if state() == STATE_OFF:
         START_TIME = time.time()
 
 
@@ -59,37 +72,36 @@ def getStatus(gpios=(PUMP_GPIO, SWEEP_GPIO)):
 
 
 def startSolar():
-    global _state_
     startPump()
-    _state_ = STATE_SOLAR
+    _setState(STATE_SOLAR)
 
 
 def startSolarMixing():
-    global _state_
     startSweep()
-    _state_ = STATE_SOLAR_MIXING
+    _setState(STATE_SOLAR_MIXING)
 
 
 def startPump():
-    global _state_
     turnOff([SWEEP_GPIO])
     turnOn([PUMP_GPIO])
-    _state_ = STATE_PUMP
+    _setState(STATE_PUMP)
 
 
 def startSweep():
-    global _state_
     turnOn([PUMP_GPIO, SWEEP_GPIO])
-    _state_ = STATE_SWEEP
+    _setState(STATE_SWEEP)
 
 
 def stopAll():
-    global _state_
     global STOP_TIME
     turnOff([PUMP_GPIO, SWEEP_GPIO])
     STOP_TIME = time.time()
-    _state_ = STATE_OFF
+    _setState(STATE_OFF)
 
+def Stopped():
+    if state() == STATE_OFF and time.time() - getStopTime() < RUN_TIME:
+        return True
+    return False
 
 def _getsched(hour, minute, push=False):
     l = time.localtime()
@@ -116,7 +128,6 @@ def _inZone(start, stop):
     return False
 
 def runOnSchedule():
-    global _state_
     global sched_pump_start
     global sched_pump_stop
     global sched_sweep_start
@@ -125,14 +136,14 @@ def runOnSchedule():
     if _inZone(sched_sweep_start, sched_sweep_stop):
         if state() != STATE_SCHEDULED_SWEEP:
             startSweep()
-            _state_ = STATE_SCHEDULED_SWEEP
+            _setState(STATE_SCHEDULED_SWEEP)
         return True
 
     if _inZone(sched_pump_start, sched_pump_stop):
         if state() != STATE_SCHEDULED_PUMP:
             startPump()
-            _state_ = STATE_SCHEDULED_PUMP
-        return True
+            _setState(STATE_SCHEDULED_PUMP)
+            return True
 
     if state() in [STATE_SCHEDULED_PUMP, STATE_SCHEDULED_SWEEP]:
         log.info("Stopping scheduled run")

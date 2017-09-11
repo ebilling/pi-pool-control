@@ -56,7 +56,7 @@ def waterTemp():
         _lastRunningWaterTime = time.time()
     # If pump isn't running, the temperature is unreliable, start the pump
     if time.time() - _lastRunningWaterTime > _maxLag:
-        if pump.state() == pump.STATE_OFF:
+        if not pump.Stopped() and pump.state() == pump.STATE_OFF:
             pump.startSolar()
     return _lastRunningWaterTemp
 

@@ -80,20 +80,24 @@ def setupFifo():
                 break
         f.close()
 
+
 def updateConfig(configfile):
     global conf, ZIP, _scale
     conf = config.config(configfile)
     ZIP = int(conf.get('weather.zip'))
     if conf.get('graph.scale') != None:
         _scale = conf.get('graph.scale')
-    if conf.get('rrd.directory') != None:
-        RRD_DIR = conf.get('rrd.directory')
-    if conf.get('pooltemp.location') != None:
-        POOL_TEMP = conf.get('pooltemp.location')
+    if conf.get('path.rrd') != None:
+        RRD_DIR = conf.get('path.rrd')
+    if conf.get('path.temperature') != None:
+        POOL_TEMP = conf.get('path.temperature')
+    if conf.get('path.status') != None:
+        pump.setStatePath(conf.get('path.status'))
     temp.setup(conf)
     pump.setup(conf)
     solar.setup(conf)
     weather.setAppid(conf.get('weather.appid'))
+
 
 def setup(configfile):
     # Initialize GPIO
@@ -112,6 +116,7 @@ def setup(configfile):
                           callback=pushButtonCallback,
                           bouncetime=200)
 
+    #TODO: Add solar radiation as right axis
     data_sources = [ 'DS:weather:GAUGE:300:-273:5000',
                      'DS:pool:GAUGE:300:-273:5000',
                      'DS:solar:GAUGE:300:-273:5000',
@@ -126,10 +131,11 @@ def setup(configfile):
 def recordTemp(weather, pool, solar, target):
     RRD.update(RrdFilename(TEMP_RRD), "N:%f:%f:%f:%f" % (
         weather, pool, solar, target))
+
     tempfile = open(POOL_TEMP, 'w+')
     tempfile.write(str(pool))
     tempfile.close()
-    
+
 
 def recordPumpActivity():
     RRD.update(RrdFilename(PUMP_RRD), "N:%d:%d" % (pump.state(), solar.state()))
@@ -153,6 +159,7 @@ def produceGraph(outfile, title, width, height, args):
     except RRD.error as e:
         log.error("RRDTool Failed with: %s" % (e))
 
+
 def appendTempLine(args, c, var, title, col, unit=FARENHEIT):
     gdef_fmt = 'DEF:t%d=%s:%s:AVERAGE'
     filename = RrdFilename(TEMP_RRD)
@@ -165,10 +172,12 @@ def appendTempLine(args, c, var, title, col, unit=FARENHEIT):
     gline_fmt = 'LINE%d:' + line + '%d%s:%s'
     args.append(gline_fmt % (2, c, color.colorStr(col), title))
     return args
-    
+
+
 def produceTempGraph(outfile="temperature.png", title='Temperatures',
                      unit=FARENHEIT, width=700, height=300):
     args = list()
+    #TODO: Add solar radiation as right axis
     args.extend(["--right-axis-label", "Degrees Farenheit",
                  "--right-axis", "1:0"])
     appendTempLine(args, 1, "weather", "Weather F", 0, unit)
@@ -198,10 +207,11 @@ def FifoThread():
         file = open(CMDFIFO, "r")
         line = file.readline()
         if not line or line == None:
+            log.debug("Empty Fifo Line")
             time.sleep(1)
             continue
-
         line = line.strip()
+        log.debug("Fifo read: " + line)
         if line == 'PUMP_ON':
             pump.startPump()
         elif line == "SWEEP_ON":

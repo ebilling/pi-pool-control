@@ -15,7 +15,6 @@ class config:
                 element = element[word]
             else:
                 return None
-        #TODO: Detect a leaf and return a string, otherwise, return dict
         if isinstance(element, dict):
             return element
         return str(element)
