@@ -14,16 +14,16 @@ WATER_GPIO = 24
 ROOF_GPIO = 25
 RED_LED = 6
 
-targetTemp = 29.5
 zipcode = 60007
+targetTemp = 29.5
+_deltaT = 2.0    # 5 degrees Celsius
+_tolerance = 1.2 # +/- temperature tolerance
+_maxLag = 25200  # 7 hours
+_mixTime = 180.0 # 3 minutes
 
 _lastRunningWaterTemp = 0.0
 _lastRunningWaterTime = 0.0
 
-_maxLag = 25200  # 7 hours
-_mixTime = 180.0 # 3 minutes
-_deltaT = 4.0    # 5 degrees Celsius
-_tolerance = 1.25 # +/- temperature tolerance
 _state_ = 0
 __initialized__ = False
 
@@ -112,7 +112,7 @@ def runPumpsIfNeeded():
     solar_on = flowThroughCollectors() # Updates temperature cache
     if solar_on:
         # pumps aren't running, but the water needs to change
-        if pump.state() == pump.STATE_OFF:
+        if pump.state() == pump.STATE_OFF and not pump.Stopped():
             log.info("SolarOn, starting pump")
             observation = weather.getCurrentTempC(zipcode)
             if observation < _lastRunningWaterTemp - _deltaT:
@@ -128,16 +128,27 @@ def runPumpsIfNeeded():
             pump.stopAll()
     return
 
-def setup(conf):
-    global __initialized__
-    global targetTemp
-    global zipcode
 
-    targetTemp = float(conf.get('temp.target'))
-    zipcode = int(conf.get('weather.zip'))
+def setup(conf):
+    global __initialized__, targetTemp, zipcode, _tolerance, _deltaT, _maxLag, _mixTime
+
+    if conf.get('temp.tolerance') != None:
+        _tolerance = float(conf.get('temp.tolerance'))
+    if conf.get('temp.minDeltaT') != None:
+        _deltaT = float(conf.get('temp.minDeltaT'))
+    if conf.get('temp.mixTime') != None:
+        _mixTime = float(conf.get('temp.mixTime'))
+    if conf.get('temp.maxTempRefresh') != None:
+        _maxLag = int(conf.get('temp.maxTempRefresh'))
+    if conf.get('temp.target') != None:
+        targetTemp = float(conf.get('temp.target'))
+    if conf.get('weather.zip') != None:
+        zipcode = int(conf.get('weather.zip'))
 
     if __initialized__ == True:
         return
+
     GPIO.setup(RED_LED, GPIO.OUT)
     GPIO.output(RED_LED, False)
+
     __initialized__ = True
