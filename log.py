@@ -21,7 +21,8 @@ def debug(msg):
 
 def trace(msg):
     s = "\n"
-    for line in traceback.format_list(traceback.extract_stack()):
+    tb = traceback.format_list(traceback.extract_stack())
+    for line in tb[:len(tb)-3]:
         s += line
     debug(msg + s)
 

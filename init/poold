@@ -13,7 +13,7 @@ set -e
 
 # /etc/init.d/poold: start and stop the poold daemon
 datadir='/var/cache/pooldata'
-pid='/var/run/poold.pid'
+pid='/tmp/poold.pid'
 conf='/etc/poold.conf'
 bin='/usr/local/bin/poold'
 

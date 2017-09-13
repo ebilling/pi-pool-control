@@ -53,7 +53,7 @@ def cleanData(gpio, x):
       old.extendleft(x)
       avg = past[gpio][1]
    else:
-      old = deque(x, 200)
+      old = deque(x, 20)
       avg = average(x)
 
    stdd = 1.5 * stddev(list(old))
@@ -88,7 +88,7 @@ def _getDischargeTime(gpio):
          end = time.time()
       tm = (end - start) * 1000000.0
       if end < timeout:
-         if tm > 20000.0 and tm < 150000.0: # roughly 115F to 35F
+         if tm > 15000.0 and tm < 150000.0: # roughly 130F to 35F
             values.append(tm)
       else:
          log.info("Temperature fetch timed out for gpio(%d)" % (gpio))
@@ -129,6 +129,8 @@ def getTempC(gpio):
    except Exception as e:
       log.trace("Could not read temperature: gpio(%d) exception(%s)" % (gpio, str(e)))
    return 0.0
+
+
 # Converts a temperature in Celsius to Farenheit
 def toFarenheit(celsius):
     return  (float(celsius) * 9.0 / 5.0) + 32.0

@@ -19,6 +19,7 @@ _scale = "24h"
 
 FARENHEIT = 0
 CELSIUS = 1
+WPSQM = 2
 
 GPIODIR = '/sys/class/gpio'
 CMDFIFO = '/tmp/poold.fifo'
@@ -109,18 +110,17 @@ def setup(configfile):
     # Read config
     updateConfig(configfile)
 
-
     # Initialize Button
     GPIO.setup(BUTTON_GPIO, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     GPIO.add_event_detect(BUTTON_GPIO, GPIO.FALLING,
                           callback=pushButtonCallback,
-                          bouncetime=200)
+                          bouncetime=300)
 
-    #TODO: Add solar radiation as right axis
     data_sources = [ 'DS:weather:GAUGE:300:-273:5000',
                      'DS:pool:GAUGE:300:-273:5000',
                      'DS:solar:GAUGE:300:-273:5000',
-                     'DS:target:GAUGE:300:-273:5000' ]
+                     'DS:target:GAUGE:300:-273:5000',
+                     'DS:radiation:GAUGE:1000:0:5000']
     setupRRD(RrdFilename(TEMP_RRD), data_sources)
 
     data_sources = [ 'DS:pump:GAUGE:300:-1:10',
@@ -128,18 +128,20 @@ def setup(configfile):
     setupRRD(RrdFilename(PUMP_RRD), data_sources, consolidation="MAX")
 
 
-def recordTemp(weather, pool, solar, target):
-    RRD.update(RrdFilename(TEMP_RRD), "N:%f:%f:%f:%f" % (
-        weather, pool, solar, target))
+def recordTemp(weather, poolTemp, solarTemp, target, radiation):
+    log.debug("Temps: weather(%0.1f) pool(%0.1f) solar(%0.1f) target(%0.1f) radiation(%0.1f)" % (
+        weather, poolTemp, solarTemp, target, radiation))
+    RRD.update(RrdFilename(TEMP_RRD), "N:%f:%f:%f:%f:%f" % (
+        weather, poolTemp, solarTemp, target, radiation))
 
     tempfile = open(POOL_TEMP, 'w+')
-    tempfile.write(str(pool))
+    tempfile.write(str(solar.runningWaterTemp()))
     tempfile.close()
 
 
 def recordPumpActivity():
-    RRD.update(RrdFilename(PUMP_RRD), "N:%d:%d" % (pump.state(), solar.state()))
     log.debug("Pumps: pump(%d) solar(%d)" % (pump.state(), solar.state()))
+    RRD.update(RrdFilename(PUMP_RRD), "N:%d:%d" % (pump.state(), solar.state()))
 
 
 def produceGraph(outfile, title, width, height, args):
@@ -148,7 +150,7 @@ def produceGraph(outfile, title, width, height, args):
     scale = "end-%s" % (_scale)
     #log.debug("outfile:%s, title:%s, width:%d, height:%d, scale:%s, args:%s" % (outfile, title, width, height, scale, args))
     try:
-        RRD.graph(outfile,
+        RRD.graph(outfile + ".tmp",
                   "--imgformat", "PNG",
                   "--end", "now",
                   "--start", scale,
@@ -159,6 +161,8 @@ def produceGraph(outfile, title, width, height, args):
     except RRD.error as e:
         log.error("RRDTool Failed with: %s" % (e))
 
+    # Rename the file to ensure atomic availability
+    os.rename(outfile + ".tmp", outfile)
 
 def appendTempLine(args, c, var, title, col, unit=FARENHEIT):
     gdef_fmt = 'DEF:t%d=%s:%s:AVERAGE'
@@ -169,6 +173,10 @@ def appendTempLine(args, c, var, title, col, unit=FARENHEIT):
         cdef_fmt = 'CDEF:f%d=9,5,/,t%d,*,32,+'
         args.append(cdef_fmt % (c, c))
         line = 'f'
+    elif unit == WPSQM:
+        cdef_fmt = 'CDEF:f%d=t%d,10,/'
+        args.append(cdef_fmt % (c, c))
+        line = 'f'
     gline_fmt = 'LINE%d:' + line + '%d%s:%s'
     args.append(gline_fmt % (2, c, color.colorStr(col), title))
     return args
@@ -177,13 +185,14 @@ def appendTempLine(args, c, var, title, col, unit=FARENHEIT):
 def produceTempGraph(outfile="temperature.png", title='Temperatures',
                      unit=FARENHEIT, width=700, height=300):
     args = list()
-    #TODO: Add solar radiation as right axis
-    args.extend(["--right-axis-label", "Degrees Farenheit",
-                 "--right-axis", "1:0"])
+    args.extend(["--right-axis-label", "Watts/sqm",
+                 "--right-axis", "10:0",
+                 "--vertical-label", "Degrees Farenheit"])
     appendTempLine(args, 1, "weather", "Weather F", 0, unit)
     appendTempLine(args, 2, "pool", "Pool F", 1, unit)
     appendTempLine(args, 3, "solar", "Solar F", 2, unit)
     appendTempLine(args, 4, "target", "Target F", 6, unit)
+    appendTempLine(args, 5, "radiation", "SolRad w/sqm", 4, WPSQM)
 
     produceGraph(outfile, title, width, height, args)
 
@@ -223,6 +232,7 @@ def FifoThread():
         file.close()
         time.sleep(1)
 
+
 def SolarThread():
     while True:
         solar.runPumpsIfNeeded()
@@ -233,6 +243,7 @@ def PumpScheduleThread():
     while True:
         pump.runOnSchedule()
         time.sleep(60)
+
 
 def main(args):
     pid = os.fork()
@@ -256,7 +267,8 @@ def main(args):
         time.sleep(30)
         updateConfig(args[1])
         recordTemp(weather.getCurrentTempC(ZIP), solar.waterTemp(),
-                   solar.roofTemp(), solar.targetTemp)
+                   solar.roofTemp(), solar.targetTemp,
+                   weather.getSolarRadiation(ZIP))
         recordPumpActivity()
         produceTempGraph(outfile=tempGraph)
         producePumpGraph(outfile=pumpGraph)

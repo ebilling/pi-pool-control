@@ -10,14 +10,14 @@ import weather
 import log
 
 SOLAR_RELAY = relay.RELAY3
-WATER_GPIO = 24
-ROOF_GPIO = 25
+WATER_GPIO = 25
+ROOF_GPIO = 24
 RED_LED = 6
 
 zipcode = 60007
-targetTemp = 29.5
-_deltaT = 2.0    # 5 degrees Celsius
-_tolerance = 1.2 # +/- temperature tolerance
+targetTemp = 30.0
+_deltaT = 2.0    # Minimum difference between roof and pool, degrees Celsius
+_tolerance = 0.5 # +/- temperature tolerance
 _maxLag = 25200  # 7 hours
 _mixTime = 180.0 # 3 minutes
 
@@ -40,25 +40,32 @@ def isNight():
 
 
 # Between 10AM and 4PM (Peak Sun)
+# TODO replace with solar intensity measurement
 def isDay():
     ts = time.localtime()
     return (ts.tm_hour < 17 and ts.tm_hour > 9)
 
+def runningWaterTemp():
+    global _lastRunningWaterTemp
+    return _lastRunningWaterTemp
 
 # Get temp from the cache and update the cache if needed/possible
 def waterTemp():
     global _lastRunningWaterTemp
     global _lastRunningWaterTime
+    t = temp.getTempC(WATER_GPIO)
 
-    # Pump is running, update the cache, stop the pump if needed
-    if pump.state() != pump.STATE_OFF and time.time() - pump.getStartTime() > _mixTime:
-        _lastRunningWaterTemp = temp.getTempC(WATER_GPIO)
+    # Pump is running, update the cache
+    if pump.state() > pump.STATE_OFF:
+        _lastRunningWaterTemp = t
         _lastRunningWaterTime = time.time()
+
     # If pump isn't running, the temperature is unreliable, start the pump
     if time.time() - _lastRunningWaterTime > _maxLag:
+        log.debug("Time(%d) lastRun(%d) maxLag(%d)" % (time.time(), _lastRunningWaterTime, _maxLag))
         if not pump.Stopped() and pump.state() == pump.STATE_OFF:
             pump.startSolar()
-    return _lastRunningWaterTemp
+    return t
 
 
 # Returns temperature of the roof
@@ -69,7 +76,7 @@ def roofTemp():
 # Returns True if the water SHOULD be sent to the panels when the pump is running
 def flowThroughCollectors():
     global _state_
-    poolTemp = waterTemp()
+    poolTemp = runningWaterTemp()
     roofTempC = roofTemp()
 
     if _lastRunningWaterTemp == 0.0:
@@ -89,7 +96,8 @@ def flowThroughCollectors():
         return True
 
     # Warming mode
-    if poolTemp < targetTemp - _tolerance and poolTemp < roofTempC - _deltaT and isDay():
+    #if poolTemp < targetTemp - _tolerance and poolTemp < roofTempC - _deltaT and isDay():
+    if poolTemp < targetTemp - _tolerance and isDay():
         if _state_ == 1:
             return True
         GPIO.output(RED_LED, True)
@@ -130,7 +138,8 @@ def runPumpsIfNeeded():
 
 
 def setup(conf):
-    global __initialized__, targetTemp, zipcode, _tolerance, _deltaT, _maxLag, _mixTime
+    global __initialized__, targetTemp, zipcode, _tolerance, _deltaT
+    global _maxLag, _mixTime, _lastRunningWaterTime, _lastRunningWaterTemp
 
     if conf.get('temp.tolerance') != None:
         _tolerance = float(conf.get('temp.tolerance'))
@@ -148,6 +157,8 @@ def setup(conf):
     if __initialized__ == True:
         return
 
+    _lastRunningWaterTime = time.time()
+    _lastRunningWaterTemp = temp.getTempC(WATER_GPIO)
     GPIO.setup(RED_LED, GPIO.OUT)
     GPIO.output(RED_LED, False)
 

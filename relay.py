@@ -10,18 +10,24 @@ RELAY2 = 27
 RELAY3 = 22
 RELAY4 = 23
 
+DEBUG = False
+
 RELAYS = [RELAY1, RELAY2, RELAY3, RELAY4]
 __initialized__ = False
 
 def turnOn(gpios):
     log.trace("TurnOn(%s):\t" % (str(gpios)))
     for gpio in gpios:
+        if DEBUG:
+            break
         GPIO.output(gpio, False)
 
 
 def turnOff(gpios):
     log.trace("TurnOff(%s):\t" % (str(gpios)))
     for gpio in gpios:
+        if DEBUG:
+            break
         GPIO.output(gpio, True)
     START_TIME = None
 
@@ -44,4 +50,3 @@ def setup():
     log.info("Running relay.setup()")
     turnOff(RELAYS)
     __initialized__ = True
-    

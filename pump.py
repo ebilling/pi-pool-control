@@ -120,7 +120,6 @@ def _inZone(start, stop):
     t = time.time()
     start_time = _getEpoch(start)
     stop_time = _getEpoch(stop)
-    log.debug("Schedule: now(%d) start(%d) stop(%d)" % (t, start_time, stop_time))
     if stop_time < start_time:
         stop_time = _getEpoch(stop, True)
     if t < stop_time and t > start_time and start_time > STOP_TIME:
