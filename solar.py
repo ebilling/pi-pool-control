@@ -18,15 +18,14 @@ zipcode = 60007
 targetTemp = 30.0
 _deltaT = 2.0    # Minimum difference between roof and pool, degrees Celsius
 _tolerance = 0.5 # +/- temperature tolerance
-_maxLag = 25200  # 7 hours
-_mixTime = 180.0 # 3 minutes
+_maxLag = 86400  # 24 hours
+_mixTime = 120   # 2 minutes
 
 _lastRunningWaterTemp = 0.0
 _lastRunningWaterTime = 0.0
 
 _state_ = 0
 __initialized__ = False
-
 
 def state():
     global _state_
@@ -39,15 +38,19 @@ def isNight():
     return (ts.tm_hour > 22 or ts.tm_hour < 6)
 
 
-# Between 10AM and 4PM (Peak Sun)
-# TODO replace with solar intensity measurement
+# Anytime there is enough sun to raise the roof temp
 def isDay():
-    ts = time.localtime()
-    return (ts.tm_hour < 17 and ts.tm_hour > 9)
+    global zipcode
+    solRad = weather.getSolarRadiation(zipcode)
+    if solRad >= 100.0:
+        return True
+    return False
+
 
 def runningWaterTemp():
     global _lastRunningWaterTemp
     return _lastRunningWaterTemp
+
 
 # Get temp from the cache and update the cache if needed/possible
 def waterTemp():
@@ -62,8 +65,8 @@ def waterTemp():
 
     # If pump isn't running, the temperature is unreliable, start the pump
     if time.time() - _lastRunningWaterTime > _maxLag:
-        log.debug("Time(%d) lastRun(%d) maxLag(%d)" % (time.time(), _lastRunningWaterTime, _maxLag))
         if not pump.Stopped() and pump.state() == pump.STATE_OFF:
+            log.debug("Running pump to get updated temperature")
             pump.startSolar()
     return t
 
@@ -89,20 +92,19 @@ def flowThroughCollectors():
     if poolTemp > targetTemp + _tolerance and poolTemp > roofTempC + _deltaT and isNight():
         if _state_ == 1:
             return True
+        log.info("Cooling - turn on solar panels")
         GPIO.output(RED_LED, True)
         relay.turnOn(SOLAR_RELAY)
-        log.info("Cooling - turn on solar panels")
         _state_ = 1
         return True
 
     # Warming mode
-    #if poolTemp < targetTemp - _tolerance and poolTemp < roofTempC - _deltaT and isDay():
     if poolTemp < targetTemp - _tolerance and isDay():
         if _state_ == 1:
             return True
+        log.info("Heating - turn on solar panels")
         GPIO.output(RED_LED, True)
         relay.turnOn([SOLAR_RELAY])
-        log.info("Heating - turn on solar panels")
         _state_ = 1
         return True
 
@@ -117,10 +119,9 @@ def flowThroughCollectors():
 
 # Run the pump if we need to warm or cool the water
 def runPumpsIfNeeded():
-    solar_on = flowThroughCollectors() # Updates temperature cache
-    if solar_on:
-        # pumps aren't running, but the water needs to change
-        if pump.state() == pump.STATE_OFF and not pump.Stopped():
+    solar_on = flowThroughCollectors() # Updates temperature cache    
+    # pumps aren't running, but the water needs to change
+    if solar_on and pump.state() == pump.STATE_OFF and not pump.Stopped():
             log.info("SolarOn, starting pump")
             observation = weather.getCurrentTempC(zipcode)
             if observation < _lastRunningWaterTemp - _deltaT:
@@ -128,13 +129,8 @@ def runPumpsIfNeeded():
                 pump.startSolarMixing()
             else:
                 pump.startSolar()
-
-    # Turn off the pumps when not needed, if started for solar
-    elif pump.state() == pump.STATE_SOLAR or pump.state() == pump.STATE_SOLAR_MIXING:
-        if time.time() - pump.getStartTime() > _mixTime:
-            log.info("SolarOff, stopping pump")
-            pump.stopAll()
-    return
+            return True
+    return False
 
 
 def setup(conf):

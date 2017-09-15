@@ -14,6 +14,7 @@ import config
 MAX_AGE = 900
 cache = {}
 appid = None
+lastSolarRadiation = 0.0
 
 def setAppid(id):
     global appid
@@ -60,12 +61,13 @@ def getCurrentTempC(zipcode):
     return float(co['current_observation']['temp_c'])
 
 def getSolarRadiation(zipcode):
+    global lastSolarRadiation
     co = getWeatherByZip(zipcode)
     if co != None:
         co = co['current_observation']
         if 'solarradiation' in co:
-            return float(co['solarradiation'])
-    return 0.0
+            lastSolarRadiation = float(co['solarradiation'])
+    return lastSolarRadiation
 
 def printDict(d):
     for key in sorted(d.keys()):

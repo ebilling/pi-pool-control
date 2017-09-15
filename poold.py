@@ -185,8 +185,8 @@ def appendTempLine(args, c, var, title, col, unit=FARENHEIT):
 def produceTempGraph(outfile="temperature.png", title='Temperatures',
                      unit=FARENHEIT, width=700, height=300):
     args = list()
-    args.extend(["--right-axis-label", "Watts/sqm",
-                 "--right-axis", "10:0",
+    args.extend(["--right-axis-label", "dekawatts/sqm",
+                 "--right-axis", "1:0",
                  "--vertical-label", "Degrees Farenheit"])
     appendTempLine(args, 1, "weather", "Weather F", 0, unit)
     appendTempLine(args, 2, "pool", "Pool F", 1, unit)
@@ -201,11 +201,11 @@ def producePumpGraph(outfile='pumps.png', title='Pump Activity', width=700, heig
     args = list()
     gdef_fmt = 'DEF:t%d=%s:%s:MAX'
     gline_fmt = 'LINE%d:t%d%s:%s'
-
+    args.extend(["--vertical-label", "Status Code", "--right-axis-label", "Status Code"])
     args.append(gdef_fmt % (1, RrdFilename(PUMP_RRD), 'pump'))
     args.append(gline_fmt % (2, 1, color.colorStr(0), 'Pump Status'))
     args.append(gdef_fmt % (2, RrdFilename(PUMP_RRD), 'solar'))
-    args.append(gline_fmt % (2, 2, color.colorStr(2), 'Solar'))
+    args.append(gline_fmt % (2, 2, color.colorStr(2), 'Solar Status'))
 
     produceGraph(outfile, title, width, height, args)
 
@@ -233,16 +233,10 @@ def FifoThread():
         time.sleep(1)
 
 
-def SolarThread():
-    while True:
-        solar.runPumpsIfNeeded()
-        time.sleep(5)
-
-
 def PumpScheduleThread():
     while True:
         pump.runOnSchedule()
-        time.sleep(60)
+        time.sleep(15)
 
 
 def main(args):
@@ -260,7 +254,6 @@ def main(args):
     pumpGraph = outdir + 'pumps.png'
     
     thread.start_new_thread(FifoThread, ())
-    thread.start_new_thread(SolarThread, ())
     thread.start_new_thread(PumpScheduleThread, ())
 
     while True:

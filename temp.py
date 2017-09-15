@@ -77,7 +77,7 @@ def _getDischargeTime(gpio):
       time.sleep(DRAINTIME)
 
       # Go into input mode
-      GPIO.setup(gpio, GPIO.IN)      
+      GPIO.setup(gpio, GPIO.IN)
 
       # Count loops until voltage across capacitor reads high on GPIO
       start = time.time()
@@ -90,6 +90,8 @@ def _getDischargeTime(gpio):
       if end < timeout:
          if tm > 15000.0 and tm < 150000.0: # roughly 130F to 35F
             values.append(tm)
+         else:
+            log.info("Temperature fetch was outside acceptable range for gpio(%d)" % (gpio))
       else:
          log.info("Temperature fetch timed out for gpio(%d)" % (gpio))
 

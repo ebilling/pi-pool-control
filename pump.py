@@ -1,6 +1,7 @@
 #!/usr/bin/python
 import RPi.GPIO as GPIO
 import relay
+import solar
 import time
 import log
 
@@ -126,6 +127,7 @@ def _inZone(start, stop):
         return True
     return False
 
+#TODO: change this to run at times for durations, only if they haven't run that long already that day.
 def runOnSchedule():
     global sched_pump_start
     global sched_pump_stop
@@ -149,6 +151,9 @@ def runOnSchedule():
         stopAll()
         return False
 
+    if solar.runPumpsIfNeeded():
+        return False
+    
     if state() != STATE_OFF and getStartTime() < time.time() - RUN_TIME:
         log.info("Stopping manual run")
         stopAll()
