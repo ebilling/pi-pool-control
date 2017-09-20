@@ -56,7 +56,7 @@ def cleanData(gpio, x):
       old = deque(x, 20)
       avg = average(x)
 
-   stdd = 1.5 * stddev(list(old))
+   stdd = 2.0 * stddev(list(old))
    n = list()
    for i in x:
       if abs(i - avg) < stdd:
@@ -88,10 +88,10 @@ def _getDischargeTime(gpio):
          end = time.time()
       tm = (end - start) * 1000000.0
       if end < timeout:
-         if tm > 15000.0 and tm < 150000.0: # roughly 130F to 35F
+         if tm > 10000.0 and tm < 150000.0: # roughly 150F to 35F
             values.append(tm)
          else:
-            log.info("Temperature fetch was outside acceptable range for gpio(%d)" % (gpio))
+            log.info("Temperature fetch was outside acceptable range for gpio(%d) time(%d)" % (gpio, tm/1000))
       else:
          log.info("Temperature fetch timed out for gpio(%d)" % (gpio))
 
