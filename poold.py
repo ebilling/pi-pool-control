@@ -41,6 +41,9 @@ def RrdFilename(x):
 
 
 def pushButtonCallback(channel):
+    time.sleep(0.1)
+    if GPIO.input(channel) != GPIO.HIGH:
+        return # false positive, humans take 1/10th sec
     state = pump.state()
     if state == pump.STATE_OFF:
         log.info("ButtonAction: Starting Pump")
@@ -112,7 +115,7 @@ def setup(configfile):
 
     # Initialize Button
     GPIO.setup(BUTTON_GPIO, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-    GPIO.add_event_detect(BUTTON_GPIO, GPIO.FALLING,
+    GPIO.add_event_detect(BUTTON_GPIO, GPIO.RISING,
                           callback=pushButtonCallback,
                           bouncetime=300)
 
@@ -248,6 +251,7 @@ def main(args):
         os._exit(0)
 
     setup(args[1])
+    pump.stopAll()
 
     outdir = IMAGEDIR
     tempGraph = outdir + 'temps.png'
