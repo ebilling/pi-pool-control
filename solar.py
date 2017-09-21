@@ -20,6 +20,7 @@ _deltaT = 2.0    # Minimum difference between roof and pool, degrees Celsius
 _tolerance = 0.5 # +/- temperature tolerance
 _maxLag = 86400  # 24 hours
 _mixTime = 120   # 2 minutes
+_minSolarRadiation = 200.0 # 200 Watts/sq-meter
 
 _lastRunningWaterTemp = 0.0
 _lastRunningWaterTime = 0.0
@@ -42,7 +43,7 @@ def isNight():
 def isDay():
     global zipcode
     solRad = weather.getSolarRadiation(zipcode)
-    if solRad >= 100.0:
+    if solRad >= _minSolarRadiation:
         return True
     return False
 
@@ -147,6 +148,8 @@ def setup(conf):
         _maxLag = int(conf.get('temp.maxTempRefresh'))
     if conf.get('temp.target') != None:
         targetTemp = float(conf.get('temp.target'))
+    if conf.get('temp.minSolarRadiation') != None:
+        _minSolarRadiation = float(conf.get('temp.minSolarRadiation'))
     if conf.get('weather.zip') != None:
         zipcode = int(conf.get('weather.zip'))
 

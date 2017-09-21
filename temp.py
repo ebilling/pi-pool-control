@@ -91,7 +91,8 @@ def _getDischargeTime(gpio):
          if tm > 10000.0 and tm < 150000.0: # roughly 150F to 35F
             values.append(tm)
          else:
-            log.info("Temperature fetch was outside acceptable range for gpio(%d) time(%d)" % (gpio, tm/1000))
+            log.info("Temperature fetch was outside acceptable range for gpio(%d) time(%dms) temp(%0.1fC)" % (
+               gpio, tm/1000, _getTemp(_getOhms(tm,gpio))))
       else:
          log.info("Temperature fetch timed out for gpio(%d)" % (gpio))
 
