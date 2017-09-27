@@ -12,9 +12,11 @@
 set -e
 
 # /etc/init.d/poold: start and stop the poold daemon
+name='pi-go-homekit'
 conf='/etc/poold.conf'
-bin='/usr/local/bin/pi-go-homekit'
-rundir='/var/run/pi-go-homekit'
+bin="/usr/local/bin/$name"
+rundir="/var/run/$name"
+pidfile="/tmp/$name.pid"
 
 test -x $bin || exit 0
 umask 022
@@ -35,20 +37,15 @@ check_data_dir() {
     fi
 }
 
-start_daemon() {
+start() {
     check_data_dir
     cd $rundir
-    log_daemon_msg "Starting server" $bin || true
-    if start-stop-daemon --start --exec $bin $conf; then
-	log_end_msg 0 || true
-    else
-	log_end_msg 1 || true
-    fi
+    $bin $conf &
 }
 
 stop_daemon() {
     log_daemon_msg "Stopping server" $bin || true
-    if start-stop-daemon --stop; then
+    if pkill -9 $name; then
 	log_end_msg 0 || true
     else
 	log_end_msg 1 || true
@@ -58,7 +55,7 @@ stop_daemon() {
 
 case "$1" in
     start)
-	start_daemon
+	start
 	;;
     stop)
 	stop_daemon
