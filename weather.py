@@ -66,7 +66,10 @@ def getSolarRadiation(zipcode):
     if co != None:
         co = co['current_observation']
         if 'solarradiation' in co:
-            lastSolarRadiation = float(co['solarradiation'])
+            if co['solarradiation'] == '--':
+                lastSolarRadiation = 0.0
+            else:
+                lastSolarRadiation = float(co['solarradiation'])
     return lastSolarRadiation
 
 def printDict(d):

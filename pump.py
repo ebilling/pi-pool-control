@@ -25,10 +25,10 @@ PUMP_STATUS = '/tmp/pump_status'
 
 _state_ = STATE_OFF
 
-sched_pump_start = "00:00"
-sched_pump_stop = "02:00"
-sched_sweep_start = "00:00"
-sched_sweep_stop = "02:00"
+sched_pump_start = None
+sched_pump_stop = None
+sched_sweep_start = None
+sched_sweep_stop = None
 
 def state():
     global _state_
@@ -93,14 +93,16 @@ def startSweep():
     _setState(STATE_SWEEP)
 
 
-def stopAll():
+def stopAll(manual=False):
     global STOP_TIME
     turnOff([PUMP_GPIO, SWEEP_GPIO])
-    STOP_TIME = time.time()
+    if manual:
+        STOP_TIME = time.time()
     _setState(STATE_OFF)
 
 def Stopped():
-    if state() == STATE_OFF and time.time() - getStopTime() < RUN_TIME:
+    global RUN_TIME, STOP_TIME
+    if state() == STATE_OFF and time.time() - STOP_TIME < RUN_TIME:
         return True
     return False
 
@@ -118,11 +120,17 @@ def _getEpoch(time_str, push=False):
     return time.mktime(local)
 
 def _inZone(start, stop):
-    t = time.time()
+    if start == None or stop == None:
+        return False
+
+    t = time.time()    
     start_time = _getEpoch(start)
     stop_time = _getEpoch(stop)
     if stop_time < start_time:
         stop_time = _getEpoch(stop, True)
+
+    log.debug("inZone(%d, %d)" % (start_time, stop_time))
+    
     if t < stop_time and t > start_time and start_time > STOP_TIME:
         return True
     return False
@@ -134,6 +142,12 @@ def runOnSchedule():
     global sched_sweep_start
     global sched_sweep_stop
 
+    relay.logStatus()
+
+    log.debug("pool(%s, %s) sweep(%s, %s)" % (
+        sched_pump_start, sched_pump_stop,
+        sched_sweep_start, sched_sweep_stop))
+    
     if _inZone(sched_sweep_start, sched_sweep_stop):
         if state() != STATE_SCHEDULED_SWEEP:
             startSweep()
@@ -146,12 +160,17 @@ def runOnSchedule():
             _setState(STATE_SCHEDULED_PUMP)
             return True
 
+    if solar.runPumpsIfNeeded():
+        return False
+    
     if state() in [STATE_SCHEDULED_PUMP, STATE_SCHEDULED_SWEEP]:
         log.info("Stopping scheduled run")
         stopAll()
         return False
 
-    if solar.runPumpsIfNeeded():
+    if state() in [STATE_SOLAR, STATE_SOLAR_MIXING]:
+        log.info("Stopping pumps for solar heating")
+        stopAll()
         return False
     
     if state() != STATE_OFF and getStartTime() < time.time() - RUN_TIME:
@@ -166,17 +185,10 @@ def setup(conf):
     global sched_pump_stop
     global sched_sweep_start
     global sched_sweep_stop
+
     # Initialize relays
     relay.setup()
-    s = conf.get("timer.pump.start")
-    if s:
-        sched_pump_start = s
-    s = conf.get("timer.pump.stop")
-    if s:
-        sched_pump_stop = s
-    s = conf.get("timer.sweep.start")
-    if s:
-        sched_sweep_start = s
-    s = conf.get("timer.sweep.stop")
-    if s:
-        sched_sweep_stop = s
+    sched_pump_start = conf.get("timer.pump.start")
+    sched_pump_stop = conf.get("timer.pump.stop")
+    sched_sweep_start = conf.get("timer.sweep.start")
+    sched_sweep_stop = conf.get("timer.sweep.stop")

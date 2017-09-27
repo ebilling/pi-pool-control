@@ -40,11 +40,14 @@ def isNight():
 
 
 # Anytime there is enough sun to raise the roof temp
-def isDay():
-    global zipcode
-    solRad = weather.getSolarRadiation(zipcode)
-    if solRad >= _minSolarRadiation:
+def isDay(rT):
+    global targetTemp, _deltaT
+    if pump.state() == pump.STATE_OFF:
+        if rT > targetTemp + _deltaT:
+            return True
+    if rT > targetTemp:
         return True
+
     return False
 
 
@@ -86,8 +89,8 @@ def flowThroughCollectors():
     if _lastRunningWaterTemp == 0.0:
         return False
 
-    #log.debug("pool(%0.1f) roof(%0.1f) target(%0.1f) tol(%0.1f) dT(%0.1f) night(%s) day(%s)" % (
-    #    poolTemp, roofTemp(), targetTemp, _tolerance, _deltaT, str(isNight()), str(isDay())))
+    log.debug("pool(%0.1f) roof(%0.1f) target(%0.1f) tol(%0.1f) dT(%0.1f) night(%s) day(%s)" % (
+        poolTemp, roofTempC, targetTemp, _tolerance, _deltaT, str(isNight()), str(isDay(roofTempC))))
 
     # Cooling mode
     if poolTemp > targetTemp + _tolerance and poolTemp > roofTempC + _deltaT and isNight():
@@ -100,7 +103,7 @@ def flowThroughCollectors():
         return True
 
     # Warming mode
-    if poolTemp < targetTemp - _tolerance and isDay():
+    if poolTemp < targetTemp - _tolerance and isDay(roofTempC):
         if _state_ == 1:
             return True
         log.info("Heating - turn on solar panels")
@@ -122,6 +125,7 @@ def flowThroughCollectors():
 def runPumpsIfNeeded():
     solar_on = flowThroughCollectors() # Updates temperature cache    
     # pumps aren't running, but the water needs to change
+    log.debug("Solar(%s) pump(%d) stopped(%s)" % (str(solar_on), pump.state(), str(pump.Stopped())))
     if solar_on and pump.state() == pump.STATE_OFF and not pump.Stopped():
             log.info("SolarOn, starting pump")
             observation = weather.getCurrentTempC(zipcode)
@@ -131,6 +135,8 @@ def runPumpsIfNeeded():
             else:
                 pump.startSolar()
             return True
+    if solar_on and not pump.Stopped():
+        return True
     return False
 
 

@@ -44,7 +44,7 @@ def variance(x):
 def stddev(x):
    return variance(x) ** 0.5
 
-def cleanData(gpio, x):   
+def cleanData(gpio, x):
    global past
    old = None
    avg = None
@@ -56,14 +56,21 @@ def cleanData(gpio, x):
       old = deque(x, 20)
       avg = average(x)
 
-   stdd = 2.0 * stddev(list(old))
-   n = list()
-   for i in x:
-      if abs(i - avg) < stdd:
-         n.append(i)
+   stdd = stddev(list(old))
+   n = x
+   # COMMENTED OUT BECAUSE WAS DOING MORE HARM THAN GOOD
+   #n = list()
+   #for i in x:
+   #   if abs(i - avg) < stdd * 2.0:
+   #      n.append(i)
    if len(n) > 0:
       n = average(n)
       past[gpio] = (old, n, time.time())
+   else:
+      log.error("No valid temp data for gpio(%d) (%s)" % (gpio, str(x)))
+      
+   log.debug("CleanData(%d, [%d]) old.len(%d) avg(%0.1f) n(%s) stddev(%0.1f) %ld" % (
+      gpio, len(x), len(old), avg, str(n), stdd, long(past[gpio][2])))
 
    return past[gpio][1]
 
@@ -122,7 +129,9 @@ def getTempC(gpio):
 
    #DEBUGGING CODE
    if gpio in _test:
+      log.debug("Using Test value for temperature on GPIO %d" % (gpio))
       return _test[gpio]
+
    try:
       if gpio in past:
          if past[gpio][2] + TTL > time.time():
@@ -131,6 +140,7 @@ def getTempC(gpio):
       return _getTemp(_getOhms(t, gpio))
    except Exception as e:
       log.trace("Could not read temperature: gpio(%d) exception(%s)" % (gpio, str(e)))
+
    return 0.0
 
 
