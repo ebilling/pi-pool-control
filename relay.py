@@ -15,21 +15,30 @@ DEBUG = False
 RELAYS = [RELAY1, RELAY2, RELAY3, RELAY4]
 __initialized__ = False
 
-def turnOn(gpios):
+def turnOn(gpios): 
+    global DEBUG
     log.trace("TurnOn(%s):\t" % (str(gpios)))
     for gpio in gpios:
         if DEBUG:
+            log.debug("In debug mode ignoring command")
             break
         GPIO.output(gpio, False)
-
-
+        
 def turnOff(gpios):
+    global DEBUG
     log.trace("TurnOff(%s):\t" % (str(gpios)))
     for gpio in gpios:
         if DEBUG:
+            log.debug("In debug mode ignoring command")
             break
         GPIO.output(gpio, True)
-    START_TIME = None
+
+
+def logStatus():
+    s = "Relay Status: "
+    for i, r in enumerate(RELAYS):
+        s = s + "RELAY%d(%d)=%d " % (i+1, r, GPIO.input(r))
+    log.debug(s)
 
 
 def getStatus(gpios):
@@ -47,6 +56,6 @@ def setup():
     # Initialize relays
     for gpio in RELAYS:
         GPIO.setup(gpio, GPIO.OUT)
+        GPIO.output(gpio, True)
     log.info("Running relay.setup()")
-    turnOff(RELAYS)
     __initialized__ = True
