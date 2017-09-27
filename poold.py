@@ -2,6 +2,7 @@
 
 import RPi.GPIO as GPIO
 import rrdtool as RRD
+import relay
 import temp
 import pump
 import time
@@ -42,7 +43,7 @@ def RrdFilename(x):
 
 def pushButtonCallback(channel):
     time.sleep(0.1)
-    if GPIO.input(channel) != GPIO.HIGH:
+    if GPIO.input(channel) != GPIO.LOW:
         return # false positive, humans take 1/10th sec
     state = pump.state()
     if state == pump.STATE_OFF:
@@ -53,7 +54,7 @@ def pushButtonCallback(channel):
         pump.startSweep()
     else:
         log.info("ButtonAction: Stopping all pumps")
-        pump.stopAll()
+        pump.stopAll(manual=True)
 
 
 def setupRRD(filename, data_sources, consolidation="AVERAGE"):
@@ -97,6 +98,12 @@ def updateConfig(configfile):
         POOL_TEMP = conf.get('path.temperature')
     if conf.get('path.status') != None:
         pump.setStatePath(conf.get('path.status'))
+    if conf.get('debug') != None:
+        if conf.get('debug') == 'True':
+            relay.DEBUG = True
+        else:
+            relay.DEBUG = False
+        log.debug("Setting relay.DEBUG=%s" % (str(relay.DEBUG)))
     temp.setup(conf)
     pump.setup(conf)
     solar.setup(conf)
@@ -115,7 +122,7 @@ def setup(configfile):
 
     # Initialize Button
     GPIO.setup(BUTTON_GPIO, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-    GPIO.add_event_detect(BUTTON_GPIO, GPIO.RISING,
+    GPIO.add_event_detect(BUTTON_GPIO, GPIO.FALLING,
                           callback=pushButtonCallback,
                           bouncetime=300)
 
@@ -229,7 +236,7 @@ def FifoThread():
         elif line == "SWEEP_ON":
             pump.startSweep()
         elif line == "OFF":
-            pump.stopAll()
+            pump.stopAll(manual=True)
         else:
             log.error("Don't know what to do with %s" % (line))
         file.close()
