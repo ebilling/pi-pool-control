@@ -68,6 +68,20 @@ def getStopTime():
     return STOP_TIME
 
 
+def runTime():
+    global START_TIME, STOP_TIME
+    if STOP_TIME > START_TIME:
+        return 0.0
+    return time.time() - START_TIME
+
+
+def stoppedFor():
+    global START_TIME, STOP_TIME
+    if STOP_TIME < START_TIME:
+        return 0.0
+    return time.time() - STOP_TIME
+
+
 def getStatus(gpios=(PUMP_GPIO, SWEEP_GPIO)):
     return relay.getStatus(gpios)
 
@@ -129,33 +143,24 @@ def _inZone(start, stop):
     if stop_time < start_time:
         stop_time = _getEpoch(stop, True)
 
-    log.debug("inZone(%d, %d)" % (start_time, stop_time))
-    
     if t < stop_time and t > start_time and start_time > STOP_TIME:
         return True
     return False
 
 #TODO: change this to run at times for durations, only if they haven't run that long already that day.
 def runOnSchedule():
-    global sched_pump_start
-    global sched_pump_stop
-    global sched_sweep_start
-    global sched_sweep_stop
+    global sched_pump_start, sched_pump_stop, sched_sweep_start, sched_sweep_stop
 
-    relay.logStatus()
-
-    log.debug("pool(%s, %s) sweep(%s, %s)" % (
-        sched_pump_start, sched_pump_stop,
-        sched_sweep_start, sched_sweep_stop))
-    
     if _inZone(sched_sweep_start, sched_sweep_stop):
         if state() != STATE_SCHEDULED_SWEEP:
+            log.info("Starting Scheduled Sweep Run")
             startSweep()
             _setState(STATE_SCHEDULED_SWEEP)
         return True
 
     if _inZone(sched_pump_start, sched_pump_stop):
         if state() != STATE_SCHEDULED_PUMP:
+            log.info("Starting Scheduled Pump Run")
             startPump()
             _setState(STATE_SCHEDULED_PUMP)
             return True

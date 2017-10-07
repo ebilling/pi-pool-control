@@ -15,7 +15,7 @@ set -e
 name='pi-go-homekit'
 conf='/etc/poold.conf'
 bin="/usr/local/bin/$name"
-rundir="/var/run/$name"
+rundir="/var/$name"
 pidfile="/tmp/$name.pid"
 
 test -x $bin || exit 0

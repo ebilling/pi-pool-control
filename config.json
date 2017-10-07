@@ -1,12 +1,9 @@
 {
+    "#debug": "False",
     "timer": {
-	"pump": {
-	    "start": "9:00",
-	    "stop": "10:30"
-	},
 	"sweep": {
-	    "start": "9:30",
-	    "stop": "9:50"
+	    "start": "12:30",
+	    "stop": "13:30"
 	}
     },
     "capacitance": {
@@ -20,17 +17,22 @@
 	"appid": "ccf828d572d7846c"
     },
     "temp": {
-	"target": "21",
+	"tolerance": "0.5",
+	"minDeltaT": "10.0",
+	"target": "31.5",
+	"minSolarRadiation": "110.0",
 	"#testvalue": { "24": "27", "25": "34.5"}
     },
     "graph": {
-	"scale": "6h"
+	"scale": "3h"
     },
     "path": {
+	"rrd": "/var/cache/pooldata",
 	"cmdfifo": "/tmp/poold.fifo",
-	"temperature": "/tmp/pool_temp"	
+	"status": "/tmp/pump_status",
+	"temperature": "/tmp/pool_temp"
     },
     "homekit": {
-	"pin": "740237184"
+	"pin": "74023718"
     }
 }

@@ -37,7 +37,10 @@ def turnOff(gpios):
 def logStatus():
     s = "Relay Status: "
     for i, r in enumerate(RELAYS):
-        s = s + "RELAY%d(%d)=%d " % (i+1, r, GPIO.input(r))
+        on = "OFF"
+        if GPIO.input(r) == 0:
+            on = "On"
+        s = s + "RELAY%d(%d)=%s " % (i+1, r, on)
     log.debug(s)
 
 

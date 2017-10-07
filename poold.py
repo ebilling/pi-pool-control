@@ -3,6 +3,7 @@
 import RPi.GPIO as GPIO
 import rrdtool as RRD
 import relay
+import json
 import temp
 import pump
 import time
@@ -139,18 +140,26 @@ def setup(configfile):
 
 
 def recordTemp(weather, poolTemp, solarTemp, target, radiation):
-    log.debug("Temps: weather(%0.1f) pool(%0.1f) solar(%0.1f) target(%0.1f) radiation(%0.1f)" % (
-        weather, poolTemp, solarTemp, target, radiation))
+    log.debug(
+        "Temps: weather(%0.1f) pool(%0.1f) running(%0.1f) solar(%0.1f) target(%0.1f) radiation(%0.1f)" %
+        (weather, poolTemp, solar.runningWaterTemp(), solarTemp, target, radiation))
     RRD.update(RrdFilename(TEMP_RRD), "N:%f:%f:%f:%f:%f" % (
         weather, poolTemp, solarTemp, target, radiation))
 
-    tempfile = open(POOL_TEMP, 'w+')
-    tempfile.write(str(solar.runningWaterTemp()))
+    data = { "waterTempC": str(poolTemp), "roofTempC": str(solarTemp),
+             "weatherTempC": str(weather), "targetTempC": str(target),
+             "solarRadiation": str(radiation) }
+
+    tempfile = open(POOL_TEMP + ".t", 'w+')
+    json.dump(data, tempfile, indent=4)
+    tempfile.write("\n")
     tempfile.close()
+    os.rename(POOL_TEMP + ".t", POOL_TEMP)
 
 
 def recordPumpActivity():
-    log.debug("Pumps: pump(%d) solar(%d)" % (pump.state(), solar.state()))
+    relay.logStatus()
+    log.debug("Pumps: pump(%d) solar(%d)" % (pump.state(),  solar.state()))
     RRD.update(RrdFilename(PUMP_RRD), "N:%d:%d" % (pump.state(), solar.state()))
 
 
@@ -223,29 +232,34 @@ def producePumpGraph(outfile='pumps.png', title='Pump Activity', width=700, heig
 def FifoThread():
     setupFifo()
     while True:
-        file = open(CMDFIFO, "r")
-        line = file.readline()
-        if not line or line == None:
-            log.debug("Empty Fifo Line")
+        try:
+            file = open(CMDFIFO, "r")
+            line = file.readline()
+            if not line or line == None:
+                log.debug("Empty Fifo Line")
+                time.sleep(1)
+                continue
+            line = line.strip()
+            log.debug("Fifo read: " + line)
+            if line == 'PUMP_ON':
+                pump.startPump()
+            elif line == "SWEEP_ON":
+                pump.startSweep()
+            elif line == "OFF":
+                pump.stopAll(manual=True)
+            else:
+                log.error("Don't know what to do with %s" % (line))
+            file.close()
             time.sleep(1)
-            continue
-        line = line.strip()
-        log.debug("Fifo read: " + line)
-        if line == 'PUMP_ON':
-            pump.startPump()
-        elif line == "SWEEP_ON":
-            pump.startSweep()
-        elif line == "OFF":
-            pump.stopAll(manual=True)
-        else:
-            log.error("Don't know what to do with %s" % (line))
-        file.close()
-        time.sleep(1)
-
+        except Exception as e:
+            log.error("Fifo thread caught and exception: " + str(e))
 
 def PumpScheduleThread():
     while True:
-        pump.runOnSchedule()
+        try:
+            pump.runOnSchedule()
+        except Exception as e:
+            log.error("Schedule thread caught an exception: " + str(e))
         time.sleep(15)
 
 
@@ -268,14 +282,17 @@ def main(args):
     thread.start_new_thread(PumpScheduleThread, ())
 
     while True:
-        time.sleep(30)
-        updateConfig(args[1])
-        recordTemp(weather.getCurrentTempC(ZIP), solar.waterTemp(),
-                   solar.roofTemp(), solar.targetTemp,
-                   weather.getSolarRadiation(ZIP))
-        recordPumpActivity()
-        produceTempGraph(outfile=tempGraph)
-        producePumpGraph(outfile=pumpGraph)
+        try:
+            time.sleep(30)
+            updateConfig(args[1])
+            recordTemp(weather.getCurrentTempC(ZIP), solar.waterTemp(),
+                       solar.roofTemp(), solar.targetTemp,
+                       weather.getSolarRadiation(ZIP))
+            recordPumpActivity()
+            produceTempGraph(outfile=tempGraph)
+            producePumpGraph(outfile=pumpGraph)
+        except Exception as e:
+            log.error("Main thread caught an exception: " + str(e))
 
     log.debug("exiting")
     GPIO.cleanup()

@@ -45,7 +45,11 @@ def isDay(rT):
     if pump.state() == pump.STATE_OFF:
         if rT > targetTemp + _deltaT:
             return True
-    if rT > targetTemp:
+        # Not enough sun yet
+        return False
+
+    # Pump is running, return true unless the temp really drops (prevents bouncing of pumps)
+    if rT > targetTemp - _tolerance:
         return True
 
     return False
@@ -86,12 +90,15 @@ def flowThroughCollectors():
     poolTemp = runningWaterTemp()
     roofTempC = roofTemp()
 
-    if _lastRunningWaterTemp == 0.0:
+    log.debug("poolRunning(%0.1f) pool(%0.1f) roof(%0.1f) target(%0.1f) tol(%0.1f) dT(%0.1f) night(%s) day(%s)" % (
+        poolTemp, waterTemp(), roofTempC, targetTemp, _tolerance, _deltaT, str(isNight()), str(isDay(roofTempC))))
+
+    # Don't bounce the pumps
+    if _state_ == 1 and pump.runTime() < 900.0:
+        return True
+    if _state_ == 0 and pump.stoppedFor() < 900.0:
         return False
-
-    log.debug("pool(%0.1f) roof(%0.1f) target(%0.1f) tol(%0.1f) dT(%0.1f) night(%s) day(%s)" % (
-        poolTemp, roofTempC, targetTemp, _tolerance, _deltaT, str(isNight()), str(isDay(roofTempC))))
-
+    
     # Cooling mode
     if poolTemp > targetTemp + _tolerance and poolTemp > roofTempC + _deltaT and isNight():
         if _state_ == 1:
@@ -123,20 +130,24 @@ def flowThroughCollectors():
 
 # Run the pump if we need to warm or cool the water
 def runPumpsIfNeeded():
+    global _lastRunningWaterTemp, zipcode, _deltaT, targetTemp
     solar_on = flowThroughCollectors() # Updates temperature cache    
-    # pumps aren't running, but the water needs to change
     log.debug("Solar(%s) pump(%d) stopped(%s)" % (str(solar_on), pump.state(), str(pump.Stopped())))
+
     if solar_on and pump.state() == pump.STATE_OFF and not pump.Stopped():
+        observation = weather.getCurrentTempC(zipcode)
+        if observation < targetTemp - _deltaT:
+            log.info("SolarOn, weather too cold, starting sweep")
+            pump.startSolarMixing()
+        elif targetTemp - _deltaT > _lastRunningWaterTemp:
+            log.info("SolarOn, pool too cold starting sweep")
+            pump.startSolarMixing()
+        else:
             log.info("SolarOn, starting pump")
-            observation = weather.getCurrentTempC(zipcode)
-            if observation < _lastRunningWaterTemp - _deltaT:
-                # Run the sweep when it's cool out to keep the deep end warming up too
-                pump.startSolarMixing()
-            else:
-                pump.startSolar()
-            return True
-    if solar_on and not pump.Stopped():
+            pump.startSolar()
         return True
+    if solar_on and not pump.Stopped():
+        return True    
     return False
 
 

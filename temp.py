@@ -57,25 +57,21 @@ def cleanData(gpio, x):
       avg = average(x)
 
    stdd = stddev(list(old))
-   n = x
-   # COMMENTED OUT BECAUSE WAS DOING MORE HARM THAN GOOD
-   #n = list()
-   #for i in x:
-   #   if abs(i - avg) < stdd * 2.0:
-   #      n.append(i)
-   if len(n) > 0:
-      n = average(n)
-      past[gpio] = (old, n, time.time())
+
+   if len(x) > 0:
+      x = average(x)
+      past[gpio] = (old, x, time.time())
    else:
       log.error("No valid temp data for gpio(%d) (%s)" % (gpio, str(x)))
       
-   log.debug("CleanData(%d, [%d]) old.len(%d) avg(%0.1f) n(%s) stddev(%0.1f) %ld" % (
-      gpio, len(x), len(old), avg, str(n), stdd, long(past[gpio][2])))
-
    return past[gpio][1]
 
 def _getDischargeTime(gpio):
+   _sleepTime = 0.0002
+   _minTime = 10000.0
+   _maxTime = 150000.0
    values = list()
+
    for i in range(0, ATTEMPTS):
       #drain the capacitor
       GPIO.setmode(GPIO.BCM)
@@ -88,14 +84,16 @@ def _getDischargeTime(gpio):
 
       # Count loops until voltage across capacitor reads high on GPIO
       start = time.time()
-      end = start
-      timeout = end + TIMEOUT
-      while (GPIO.input(gpio) == GPIO.LOW) and (end < timeout):
-         time.sleep(0.0002)
+      timeout = start + TIMEOUT
+      while True:
+         time.sleep(_sleepTime)
          end = time.time()
+         if (GPIO.input(gpio) != GPIO.LOW) or (end > timeout):
+            break
+
       tm = (end - start) * 1000000.0
       if end < timeout:
-         if tm > 10000.0 and tm < 150000.0: # roughly 150F to 35F
+         if tm > _minTime and tm < _maxTime: # roughly 150F to 35F
             values.append(tm)
          else:
             log.info("Temperature fetch was outside acceptable range for gpio(%d) time(%dms) temp(%0.1fC)" % (
