@@ -4,6 +4,10 @@ mv /etc/apache2/apache2.conf /etc/apache2/apache2.conf.orig
 cp -p apache2.conf /etc/apache2/.
 
 cp -p index.* /var/www/html/.
+touch /tmp/temps.png /tmp/pumps.png /tmp/temps.txt
+ln -s /tmp/temps.png /var/www/html/temps.png
+ln -s /tmp/pumps.png /var/www/html/pumps.png
+ln -s /tmp/temps.txt /var/www/html/temps.txt
 
 cd /etc/apache2/mods-enabled
 ln -s ../mods-available/cgi.load .
