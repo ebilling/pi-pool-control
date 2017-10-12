@@ -6,6 +6,8 @@ import math
 import time
 import log
 import config
+import thread
+import threading
 
 TIMEOUT = 1.0   # 1s
 DRAINTIME = 0.2 # 200ms
@@ -13,6 +15,7 @@ ATTEMPTS = 5
 
 TTL = 60.0 # 1 minutes
 
+locks = {}
 cap = {}
 past = {}
 _test = {} # testing values
@@ -44,35 +47,51 @@ def variance(x):
 def stddev(x):
    return variance(x) ** 0.5
 
+def median(x):
+   if len(x) > 2:
+      return sorted(x)[len(x)/2]
+   return average(x)
+
 def cleanData(gpio, x):
    global past
    old = None
-   avg = None
+
    if gpio in past:
       old = past[gpio][0]
       old.extendleft(x)
-      avg = past[gpio][1]
    else:
-      old = deque(x, 20)
-      avg = average(x)
+      old = deque(x, 100)
 
    stdd = stddev(list(old))
+   med = median(x)
+   n = list()
 
-   if len(x) > 0:
-      x = average(x)
-      past[gpio] = (old, x, time.time())
+   for i in x:
+      if abs(i - med) < stdd:
+         n.append(i)
+
+   if len(n) > 0:
+      val = average(n)
+      past[gpio] = (old, val, time.time())
    else:
-      log.error("No valid temp data for gpio(%d) (%s)" % (gpio, str(x)))
-      
+      log.error("No valid temp data for gpio(%d) orig(%s) cleaned(%s)" % (gpio, str(x), str(n)))
+
    return past[gpio][1]
 
 def _getDischargeTime(gpio):
+   global locks
    _sleepTime = 0.0002
-   _minTime = 10000.0
-   _maxTime = 150000.0
+   _minTime = 3000.0
+   _maxTime = 500000.0
    values = list()
 
+   if gpio not in locks:
+      locks[gpio] = threading.Lock()
+
+   lock = locks[gpio]
+
    for i in range(0, ATTEMPTS):
+      lock.acquire()
       #drain the capacitor
       GPIO.setmode(GPIO.BCM)
       GPIO.setup(gpio, GPIO.OUT)
@@ -88,18 +107,19 @@ def _getDischargeTime(gpio):
       while True:
          time.sleep(_sleepTime)
          end = time.time()
-         if (GPIO.input(gpio) != GPIO.LOW) or (end > timeout):
+         if (GPIO.input(gpio) != GPIO.LOW) or (end > timeout) or end > timeout:
             break
 
       tm = (end - start) * 1000000.0
       if end < timeout:
-         if tm > _minTime and tm < _maxTime: # roughly 150F to 35F
+         if tm > _minTime and tm < _maxTime:
             values.append(tm)
          else:
-            log.info("Temperature fetch was outside acceptable range for gpio(%d) time(%dms) temp(%0.1fC)" % (
-               gpio, tm/1000, _getTemp(_getOhms(tm,gpio))))
+            log.info("Temperature fetch was outside acceptable range for gpio(%d) time(%0.2f ms) temp(%0.1f C)" % (
+               gpio, tm/1000.0, _getTemp(_getOhms(tm,gpio))))
       else:
          log.info("Temperature fetch timed out for gpio(%d)" % (gpio))
+      lock.release()
 
    return cleanData(gpio, values)
 
