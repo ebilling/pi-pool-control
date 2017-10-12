@@ -26,6 +26,7 @@ _lastRunningWaterTemp = 0.0
 _lastRunningWaterTime = 0.0
 
 _state_ = 0
+_disabled = False
 __initialized__ = False
 
 def state():
@@ -33,10 +34,13 @@ def state():
     return _state_
 
 
-# Between 11PM and 5AM (Coldest Time)
-def isNight():
+# Between 7PM and 5AM (Coldest Time)
+def isNight(rT):
     ts = time.localtime()
-    return (ts.tm_hour > 22 or ts.tm_hour < 6)
+    if ts.tm_hour > 18 or ts.tm_hour < 6:
+        if rT < targetTemp - _deltaT:
+            return True
+    return False
 
 
 # Anytime there is enough sun to raise the roof temp
@@ -90,9 +94,13 @@ def flowThroughCollectors():
     poolTemp = runningWaterTemp()
     roofTempC = roofTemp()
 
-    log.debug("poolRunning(%0.1f) pool(%0.1f) roof(%0.1f) target(%0.1f) tol(%0.1f) dT(%0.1f) night(%s) day(%s)" % (
-        poolTemp, waterTemp(), roofTempC, targetTemp, _tolerance, _deltaT, str(isNight()), str(isDay(roofTempC))))
+    log.debug("poolRunning(%0.1f) pool(%0.1f) roof(%0.1f) target(%0.1f) tol(%0.1f) dT(%0.1f) night(%s) day(%s) disabled(%s)" % (
+        poolTemp, waterTemp(), roofTempC, targetTemp, _tolerance, _deltaT, str(isNight(roofTempC)), str(isDay(roofTempC)), str(_disabled)))
 
+    # Solar disabled
+    if _disabled:
+        return False
+    
     # Don't bounce the pumps
     if _state_ == 1 and pump.runTime() < 900.0:
         return True
@@ -100,7 +108,7 @@ def flowThroughCollectors():
         return False
     
     # Cooling mode
-    if poolTemp > targetTemp + _tolerance and poolTemp > roofTempC + _deltaT and isNight():
+    if poolTemp > targetTemp + _tolerance and poolTemp > roofTempC + _deltaT and isNight(roofTempC):
         if _state_ == 1:
             return True
         log.info("Cooling - turn on solar panels")
@@ -152,7 +160,7 @@ def runPumpsIfNeeded():
 
 
 def setup(conf):
-    global __initialized__, targetTemp, zipcode, _tolerance, _deltaT
+    global __initialized__, targetTemp, zipcode, _tolerance, _deltaT, _disabled
     global _maxLag, _mixTime, _lastRunningWaterTime, _lastRunningWaterTemp
 
     if conf.get('temp.tolerance') != None:
@@ -165,6 +173,10 @@ def setup(conf):
         _maxLag = int(conf.get('temp.maxTempRefresh'))
     if conf.get('temp.target') != None:
         targetTemp = float(conf.get('temp.target'))
+    if conf.get('temp.solarDisabled') == 'True':
+        _disabled = True
+    else:
+        _disabled = False
     if conf.get('temp.minSolarRadiation') != None:
         _minSolarRadiation = float(conf.get('temp.minSolarRadiation'))
     if conf.get('weather.zip') != None:
