@@ -262,8 +262,16 @@ def PumpScheduleThread():
             log.error("Schedule thread caught an exception: " + str(e))
         time.sleep(15)
 
+def writeTempData():
+    global IMAGEDIR
+    f = open(IMAGEDIR + "temps.txt", "w+")
+    for key in temp.past:
+        for i in temp.past[key][0]:
+            f.write("%d, %0.2f, %0.2f\n" % (key, i, temp._getTemp(temp._getOhms(i,key))))
+    f.close()
 
 def main(args):
+    global IMAGEDIR
     pid = os.fork()
     if pid:
         pidfile = open(PIDFILE, "w+")
@@ -291,6 +299,7 @@ def main(args):
             recordPumpActivity()
             produceTempGraph(outfile=tempGraph)
             producePumpGraph(outfile=pumpGraph)
+            writeTempData()
         except Exception as e:
             log.error("Main thread caught an exception: " + str(e))
 
