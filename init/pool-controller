@@ -12,7 +12,7 @@
 set -e
 
 # /etc/init.d/poold: start and stop the poold daemon
-name='pi-go-homekit'
+name='pool-controller'
 conf='/etc/poold.conf'
 bin="/usr/local/bin/$name"
 rundir="/var/cache/homekit"

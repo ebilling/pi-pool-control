@@ -2,8 +2,8 @@
     "#debug": "False",
     "timer": {
 	"sweep": {
-	    "start": "12:30",
-	    "stop": "13:30"
+	    "start": "1:30",
+	    "stop": "2:30"
 	}
     },
     "capacitance": {
@@ -21,10 +21,11 @@
 	"minDeltaT": "10.0",
 	"target": "31.5",
 	"minSolarRadiation": "110.0",
+	"solarDisabled": "False",
 	"#testvalue": { "24": "27", "25": "34.5"}
     },
     "graph": {
-	"scale": "3h"
+	"scale": 24
     },
     "path": {
 	"rrd": "/var/cache/pooldata",
@@ -33,6 +34,7 @@
 	"temperature": "/tmp/pool_temp"
     },
     "homekit": {
-	"pin": "74023718"
+	"pin": "74023718",
+	"data": "/var/cache/homekit"
     }
 }
